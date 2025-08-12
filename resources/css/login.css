@@ -1,0 +1,42 @@
+/* Menggunakan font Inter untuk seluruh halaman */
+body {
+    font-family: "Inter", sans-serif;
+    /* Menggunakan gradasi sebagai latar belakang */
+    background: linear-gradient(135deg, #1c4f9d 0%, #feb639 100%);
+}
+
+/* Kontainer utama untuk memusatkan form secara vertikal */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+/* Styling untuk card login */
+.login-card {
+    border: none; /* Menghapus border default */
+    border-radius: 1rem; /* Sudut yang lebih tumpul */
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.1); /* Bayangan yang lebih lembut */
+    overflow: hidden; /* Memastikan konten tetap di dalam sudut tumpul */
+}
+
+/* Menyesuaikan tinggi input dengan floating label */
+.form-floating .form-control {
+    height: calc(3.5rem + 2px);
+    line-height: 1.25;
+}
+
+.form-floating > label {
+    padding-top: 1.125rem;
+}
+
+/* Styling untuk tombol toggle password */
+#togglePassword {
+    border-left: 0;
+    border-color: #ced4da;
+}
+#togglePassword:hover {
+    background-color: #e9ecef;
+}

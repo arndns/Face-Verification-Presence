@@ -1,0 +1,243 @@
+/*
+         * CSS UTAMA UNTUK LAYOUT
+         */
+:root {
+    --primary-color: #0004e0;
+    --orange-color: #fc7100;
+    --secondary-color: #6c757d;
+    --bg-light: #f8f9fa;
+    --bg-white: #ffffff;
+    --text-dark: #212529;
+    --text-light: #f8f9fa;
+    --sidebar-width: 280px; /* Lebar sidebar, bisa diubah */
+    --border-color: #dee2e6; /* Warna border Bootstrap */
+    --header-height: 73px; /* Menetapkan tinggi standar untuk header */
+}
+
+body {
+    font-family: "Inter", sans-serif;
+    background-color: var(--bg-light);
+    color: var(--text-dark);
+    overflow-x: hidden;
+}
+
+.wrapper {
+    display: flex;
+    width: 100%;
+    align-items: stretch;
+}
+
+/* --- Gaya Sidebar --- */
+#sidebar {
+    min-width: var(--sidebar-width);
+    max-width: var(--sidebar-width);
+    background: linear-gradient(
+        180deg,
+        var(--orange-color),
+        var(--primary-color)
+    );
+    color: var(--text-light);
+    transition: all 0.3s ease-in-out;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1031;
+    display: flex;
+    flex-direction: column;
+}
+
+#sidebar.collapsed {
+    margin-left: calc(-1 * var(--sidebar-width));
+}
+
+.sidebar-header {
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    min-height: var(--header-height);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+}
+
+#sidebar .components {
+    /* PERBAIKAN: Menghapus flex-grow agar tombol logout tidak terdorong ke bawah */
+    padding: 20px 0;
+}
+
+#sidebar ul li a {
+    padding: 15px 25px;
+    font-size: 1.1em;
+    display: block;
+    color: rgba(255, 255, 255, 0.8);
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+#sidebar ul li a:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.15);
+}
+
+#sidebar ul li.active > a,
+a[aria-expanded="true"] {
+    color: #fff;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+#sidebar ul li a i {
+    margin-right: 15px;
+    min-width: 20px;
+    text-align: center;
+}
+
+#sidebar .CTAs {
+    padding: 20px;
+    background: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* --- Gaya Konten Utama (termasuk Navbar) --- */
+#content {
+    width: 100%;
+    min-height: 100vh;
+    transition: all 0.3s ease-in-out;
+    padding-left: var(--sidebar-width);
+    background-color: var(--bg-light);
+}
+
+#sidebar.collapsed + #content {
+    padding-left: 0;
+}
+
+/* --- Gaya Navbar (Sebagai Pembatas) --- */
+.main-navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+    background-color: var(--bg-light) !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    border-bottom: 1px solid var(--border-color);
+    min-height: var(--header-height);
+    display: flex;
+    align-items: center;
+    padding: 0 1.5rem !important;
+}
+
+#sidebarCollapse {
+    border: none;
+    background-color: #f1f1f1;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease-in-out;
+}
+#sidebarCollapse:hover {
+    background-color: #e9ecef;
+}
+
+#sidebar.collapsed + #content .main-navbar #sidebarCollapse {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* --- Area Konten di bawah Navbar --- */
+.main-content-area {
+    padding: 1.5rem;
+}
+
+/* --- Gaya Kartu Statistik --- */
+.stat-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s;
+    color: white;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card .card-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.stat-card .stat-icon {
+    font-size: 3rem;
+    opacity: 0.6;
+}
+
+/* --- Gaya Tabel --- */
+.table-container {
+    background: var(--bg-white);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1030;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+#sidebar:not(.collapsed) ~ .sidebar-backdrop {
+    opacity: 1;
+    visibility: visible;
+}
+
+@media (max-width: 768px) {
+    #content {
+        padding-left: 0;
+    }
+
+    #sidebar.collapsed + #content {
+        padding-left: 0;
+    }
+}
+
+/* Style for search form */
+.search-form {
+    width: 280px; /* Adjust width as needed */
+}
+.search-input-container {
+    position: relative;
+}
+.search-input-container .form-control {
+    /* Add padding to the left to make space for the icon */
+    padding-left: 2.5rem;
+}
+.search-input-container .search-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6c757d; /* Icon color */
+}
+
+/* Styling untuk card container */
+.form-container {
+    max-width: 700px;
+    margin: 50px auto;
+    padding: 30px;
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+/* Memberi sedikit jarak antar elemen form */
+.form-label {
+    font-weight: 500;
+}
+
+
