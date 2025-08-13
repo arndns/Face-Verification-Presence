@@ -1,0 +1,38 @@
+/* Style Global */
+body {
+    font-family: "Inter", sans-serif;
+    background-image: linear-gradient(to top right, #0d6efd, #fd7e14);
+    background-attachment: fixed;
+}
+.bottom-nav a.active {
+    color: var(--bs-primary);
+}
+
+/* Style Khusus Halaman Home (sekarang digabung di sini) */
+.profile-header {
+    background-color: transparent;
+}
+.content-card {
+    border-top-left-radius: 40px;
+    border-top-right-radius: 40px;
+    padding-bottom: 80px;
+}
+@media (min-width: 768px) {
+    .content-card {
+        padding-bottom: 0;
+    }
+}
+.gradasigreen {
+    background-image: linear-gradient(to right, #198754, #1ed760);
+    color: white;
+    border: none;
+}
+.gradasired {
+    background-image: linear-gradient(to right, #dc3545, #ff7854);
+    color: white;
+    border: none;
+}
+#chartdiv {
+    width: 100%;
+    height: 350px;
+}

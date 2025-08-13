@@ -17,6 +17,7 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function(){
     Route::get('/login', [AuthController::class, 'index'])->name('login');
     Route::post('/login', [AuthController::class, 'store'])->name('login.post');
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 });
 
 Route::middleware('auth')->group(function(){
@@ -34,6 +35,7 @@ Route::middleware('auth')->group(function(){
     
     Route::middleware( 'role:employee')->group(function () {
         Route::get('/employee', [EmployeeController::class, 'index'])->name('employee.index');    
+        Route::get('/camera', [EmployeeController::class, 'webcam'])->name('employee.camera');    
     });
 
     Route::middleware('role:owner')->group(function () {
