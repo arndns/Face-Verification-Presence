@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="public/assets/image/nuansa-laras-icon.ico" alt="Logo Instansi" width="128"/>
+</p>
+
 # Face Verification Presence
 
 Sebuah aplikasi web yang dibangun dengan Laravel untuk manajemen kehadiran atau presensi menggunakan teknologi verifikasi wajah.
@@ -16,7 +20,14 @@ Aplikasi ini memungkinkan pengguna untuk melakukan absensi dengan memindai wajah
 
 ## Teknologi yang Digunakan
 
+<p>
+  <img src="https://img.shields.io/badge/php-%23777BB4.svg?&logo=php&logoColor=white" alt="PHP" />
+  <img src="https://img.shields.io/badge/Laravel-%23FF2D20.svg?logo=laravel&logoColor=white" alt="Laravel" />
+  <img src="https://img.shields.io/badge/Bootstrap-7952B3?logo=bootstrap&logoColor=fff" alt="Bootstrap" />
+</p>
+
 *   **Backend:** PHP 8.2+, Laravel 12
+*   **Frontend:** Bootstrap
 *   **Database:** (Dapat disesuaikan) MySQL, PostgreSQL, SQLite
 
 ## Panduan Instalasi
