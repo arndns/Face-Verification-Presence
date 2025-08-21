@@ -36,3 +36,153 @@ body {
     width: 100%;
     height: 350px;
 }
+
+.bottom-nav a {
+    flex: 1;
+    text-decoration: none;
+    color: #6c757d; /* text-muted */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.bottom-nav a.active {
+    color: #212529; /* text-dark */
+}
+
+/* Styling label teks */
+.bottom-nav a span {
+    font-size: 0.7rem;
+    margin-top: 0.25rem;
+}
+
+/* Styling ikon kamera yang menonjol */
+.fab-camera-link {
+    /* Mengangkat elemen secara visual menggunakan margin negatif */
+    margin-top: -2.5rem;
+    z-index: 20;
+    /* Mengatur display menjadi flex untuk menata ikon di tengah */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Latar belakang lingkaran untuk ikon kamera */
+.camera-icon-circle {
+    width: 3.5rem;
+    height: 3.5rem;
+    background-color: #3b82f6; /* Warna biru */
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    transition: transform 0.3s ease-in-out;
+}
+
+.camera-icon-circle i {
+    color: #ffffff;
+}
+
+.camera-icon-circle:hover {
+    transform: scale(1.1);
+}
+
+/* Mengatur posisi teks kamera agar sejajar dengan teks lain */
+.camera-text {
+    color: #3b82f6;
+    font-weight: 500;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 700px;
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+h1 {
+    color: #333;
+    margin-bottom: 20px;
+}
+.webcam-container {
+    border: 5px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background-color: #000;
+}
+#webcamVideo {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+.button-container {
+    margin-top: 20px;
+    display: flex;
+    gap: 15px;
+}
+button {
+    padding: 12px 25px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 8px;
+    border: none;
+    background-color: #007bff;
+    color: white;
+    transition: background-color 0.3s, transform 0.2s;
+}
+button:hover {
+    background-color: #0056b3;
+    transform: translateY(-2px);
+}
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+    transform: none;
+}
+/* Style khusus untuk tombol Stop */
+button.stop-button {
+    background-color: #dc3545; /* Warna merah */
+}
+button.stop-button:hover {
+    background-color: #c82333;
+}
+#photo-container {
+    width: 100%;
+    margin-top: 25px;
+    text-align: center;
+}
+h2 {
+    color: #444;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+canvas {
+    display: none;
+}
+#photos {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+}
+#photos img {
+    max-width: 150px;
+    border: 3px solid #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transform: scaleX(-1);
+}

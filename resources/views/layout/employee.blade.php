@@ -11,6 +11,7 @@
     <!-- Font Awesome untuk Ikon -->
     <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}">
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js"></script>
       <!-- amCharts 4 JS -->
     <script src="https://cdn.amcharts.com/lib/4/core.js"></script>
     <script src="https://cdn.amcharts.com/lib/4/charts.js"></script>
@@ -45,30 +46,32 @@
     @yield('content')
         <!-- Navigasi Bawah (Terlihat di semua ukuran layar) -->
     <nav class="navbar fixed-bottom bg-white shadow-lg bottom-nav">
-        <div class="container-fluid d-flex justify-content-around">
-            <a href="{{route('employee.index')}}" class="text-center text-decoration-none text-muted small active">
+        <div class="container-fluid d-flex justify-content-around align-items-end">
+            <a href="{{route('employee.index')}}" class="active">
                 <i class="fa-solid fa-house fs-4"></i>
-                <span class="d-block" style="font-size: 0.7rem;">Home</span>
+                <span>Home</span>
             </a>
-            <a href="#" class="text-center text-decoration-none text-muted small">
+            <a href="#">
                 <i class="fa-solid fa-file-lines fs-4"></i>
-                <span class="d-block" style="font-size: 0.7rem;">Laporan</span>
+                <span>Laporan</span>
             </a>
-            <a href="#" class="text-center text-decoration-none text-muted small">
+            
+            <!-- Ikon kamera, sekarang menjadi bagian dari alur menu normal -->
+            <a href="{{route('employee.camera')}}" class="fab-camera-link">
+                <div class="camera-icon-circle">
+                    <i class="fa-solid fa-camera fs-4"></i>
+                </div>
+                <!-- Teks kamera yang sejajar dengan teks menu lain -->
+                <span class="camera-text">Kamera</span>
+            </a>
+            
+            <a href="#">
                 <i class="fa-solid fa-calendar-plus fs-4"></i>
-                <span class="d-block" style="font-size: 0.7rem;">Pengajuan</span>
+                <span>Pengajuan</span>
             </a>
-            <a href="{{route('employee.camera')}}" class="text-center text-decoration-none text-muted small">
-                <i class="fa-solid fa-camera fs-4"></i>
-                <span class="d-block" style="font-size: 0.7rem;">Kamera</span>
-            </a>
-            <a href="#" class="text-center text-decoration-none text-muted small">
+            <a href="#">
                 <i class="fa-solid fa-wallet fs-4"></i>
-                <span class="d-block" style="font-size: 0.7rem;">Pendapatan</span>
-            </a>
-            <a href="#" class="text-center text-decoration-none text-muted small">
-                <i class="fa-solid fa-user fs-4"></i>
-                <span class="d-block" style="font-size: 0.7rem;">Profil</span>
+                <span>Pendapatan</span>
             </a>
         </div>
     </nav>
