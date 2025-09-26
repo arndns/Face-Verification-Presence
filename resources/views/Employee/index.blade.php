@@ -1,58 +1,83 @@
 @extends('layout.employee')
 @section('title', 'Dashboard')
 @section('content')
-    <!-- Bagian Profil -->
-    <div class="profile-header text-white position-relative z-1">
-        <div class="container p-4">
-            <div class="d-flex align-items-center">
-                <img id="user-profile-picture" src="https://placehold.co/80x80/FFFFFF/0D6EFD?text=B" alt="Avatar Pengguna"
-                    class="rounded-circle border border-4 border-white-50">
-                <div class="ms-3">
-                    <h2 class="fw-bold mb-0">{{$user->nama}}</h2>
-                    <p class="mb-0 fs-5 opacity-75">{{$user->jabatan}}</p>
+    <div class="page active" id="home-page">
+        <div class="user-section">
+            <div class="user-detail">
+                <div class="user-identity">
+                    <div class="avatar">
+                        <img src="{{ asset('assets/image/profil-picture.png') }}" alt="avatar"
+                            class="imaged w64 rounded-circle">
+                    </div>
+                    <div class="user-info">
+                        <h2 id="user-name">{{ $user->nama }}</h2>
+                        <span id="user-role">{{ $user->jabatan }}</span>
+                    </div>
+                </div>
+                <div class="logout-button">
+                    <form action="{{ route('logout') }}" method="POST" id="logout-form">
+                        @csrf
+                        <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i class="fa-solid fa-sign-out-alt"></i></a>
+                    </form>
                 </div>
             </div>
         </div>
-    </div>
-    <!-- Konten dengan Lengkungan -->
-    <div class="content-card bg-white shadow-lg flex-grow-1 mt-4">
-        <div class="container p-4">
-            <!-- Fitur Absen -->
-            <div class="row g-3">
-                <div class="col-6">
-                    <div class="card gradasigreen rounded-4 shadow">
-                        <div class="card-body p-3">
-                            <div class="d-flex align-items-center">
-                                <i class="fa-solid fa-camera fs-1 me-3"></i>
-                                <div>
-                                    <h4 class="fw-bold mb-0">Masuk</h4>
-                                    <span class="small">07:00</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-6">
-                    <div class="card gradasired rounded-4 shadow">
-                        <div class="card-body p-3">
-                            <div class="d-flex align-items-center">
-                                <i class="fa-solid fa-camera fs-1 me-3"></i>
-                                <div>
-                                    <h4 class="fw-bold mb-0">Pulang</h4>
-                                    <span class="small">15:00</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Chart Section -->
-            <hr class="my-4">
-            <div>
-                <h5 class="fw-bold mb-3">Ringkasan Kehadiran Bulan Ini</h5>
-                <div id="chartdiv"></div>
+        <div class="menu-section-container">
+            <div class="card shadow-sm rounded-3">
+                <div class="card-body text-center py-4">
+                    <div class="list-menu">
+                        <div class="item-menu">
+                            <a href="#" class="text-green"><i class="fa-solid fa-user"></i></a>
+                            <div class="menu-name"><span>Profil</span></div>
+                        </div>
+                        <div class="item-menu">
+                            <a href="#" class="text-danger"><i class="fa-solid fa-calendar-alt"></i></a>
+                            <div class="menu-name"><span>Cuti</span></div>
+                        </div>
+                        <div class="item-menu">
+                            <a href="#" class="text-warning"><i class="fa-solid fa-history"></i></a>
+                            <div class="menu-name"><span>Histori</span></div>
+                        </div>
+                        <div class="item-menu">
+                            <a href="#" class="text-orange"><i class="fa-solid fa-map-marker-alt"></i></a>
+                            <div class="menu-name">Lokasi</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="presence-section-container">
+            <div class="today-presence">
+                <div class="row g-2">
+                    <div class="col">
+                        <div class="card bg-green-presence">
+                            <div class="card-body">
+                                <div class="presence-content">
+                                    <div class="icon-presence"><i class="fa-solid fa-camera"></i></div>
+                                    <div class="presence-detail">
+                                        <h4 class="presence-title">Masuk</h4><span>07:00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <div class="card bg-red-presence">
+                            <div class="card-body">
+                                <div class="presence-content">
+                                    <div class="icon-presence"><i class="fa-solid fa-camera"></i></div>
+                                    <div class="presence-detail">
+                                        <h4 class="presence-title">Pulang</h4><span>12:00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
+
 @endsection

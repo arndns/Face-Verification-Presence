@@ -1,188 +1,232 @@
-/* Style Global */
+/* bagian layout */
+
+/* Pengaturan Body dan Font Dasar */
 body {
+    background-color: #e9ecef;
     font-family: "Inter", sans-serif;
-    background-image: linear-gradient(to top right, #0d6efd, #fd7e14);
-    background-attachment: fixed;
-}
-.bottom-nav a.active {
-    color: var(--bs-primary);
+    padding-bottom: 70px;
 }
 
-/* Style Khusus Halaman Home (sekarang digabung di sini) */
-.profile-header {
-    background-color: transparent;
-}
-.content-card {
-    border-top-left-radius: 40px;
-    border-top-right-radius: 40px;
-    padding-bottom: 80px;
-}
-@media (min-width: 768px) {
-    .content-card {
-        padding-bottom: 0;
-    }
-}
-.gradasigreen {
-    background-image: linear-gradient(to right, #198754, #1ed760);
-    color: white;
-    border: none;
-}
-.gradasired {
-    background-image: linear-gradient(to right, #dc3545, #ff7854);
-    color: white;
-    border: none;
-}
-#chartdiv {
+/* Bagian Loader */
+#loader {
+    position: fixed;
+    top: 0;
+    left: 0;
     width: 100%;
-    height: 350px;
+    height: 100%;
+    background: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    transition: opacity 0.5s;
 }
 
-.bottom-nav a {
-    flex: 1;
+/* bagian menu footer */
+.app-bottom-menu {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: white;
+    display: flex;
+    justify-content: space-around;
+    /* PERBAIKAN: Diubah menjadi 'flex-end' untuk meratakan semua item di bagian bawah, 
+               sehingga tulisannya menjadi sejajar. */
+    align-items: flex-end;
+    height: 65px;
+    padding-bottom: 5px; /* Memberi sedikit ruang di bawah */
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+.app-bottom-menu .item {
+    text-align: center;
+    color: #6c757d;
     text-decoration: none;
-    color: #6c757d; /* text-muted */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-.bottom-nav a.active {
-    color: #212529; /* text-dark */
-}
-
-/* Styling label teks */
-.bottom-nav a span {
-    font-size: 0.7rem;
-    margin-top: 0.25rem;
-}
-
-/* Styling ikon kamera yang menonjol */
-.fab-camera-link {
-    /* Mengangkat elemen secara visual menggunakan margin negatif */
-    margin-top: -2.5rem;
-    z-index: 20;
-    /* Mengatur display menjadi flex untuk menata ikon di tengah */
+    flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
-
-/* Latar belakang lingkaran untuk ikon kamera */
-.camera-icon-circle {
-    width: 3.5rem;
-    height: 3.5rem;
-    background-color: #3b82f6; /* Warna biru */
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    transition: transform 0.3s ease-in-out;
+.app-bottom-menu .item.active {
+    color: #1d4ed8;
 }
-
-.camera-icon-circle i {
-    color: #ffffff;
+.app-bottom-menu .item i {
+    font-size: 22px;
+    display: block;
+    margin-bottom: 4px;
 }
-
-.camera-icon-circle:hover {
-    transform: scale(1.1);
-}
-
-/* Mengatur posisi teks kamera agar sejajar dengan teks lain */
-.camera-text {
-    color: #3b82f6;
+.app-bottom-menu .item strong {
+    font-size: 0.75rem;
     font-weight: 500;
 }
 
-.container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-    max-width: 700px;
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-h1 {
-    color: #333;
-    margin-bottom: 20px;
-}
-.webcam-container {
-    border: 5px solid #ddd;
-    border-radius: 8px;
-    overflow: hidden;
-    position: relative;
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    background-color: #000;
-}
-#webcamVideo {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: cover;
-    transform: scaleX(-1);
-}
-.button-container {
-    margin-top: 20px;
-    display: flex;
-    gap: 15px;
-}
-button {
-    padding: 12px 25px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    border-radius: 8px;
-    border: none;
-    background-color: #007bff;
+.app-bottom-menu .camera-col i {
     color: white;
-    transition: background-color 0.3s, transform 0.2s;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(145deg, #2979ff, #1d4ed8);
+    border-radius: 50%;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    margin-bottom: 4px;
 }
-button:hover {
-    background-color: #0056b3;
-    transform: translateY(-2px);
+/*bagian wrapper aplikasi */
+.app-capsule {
+    padding: 0;
+    padding-bottom: 80px;
 }
-button:disabled {
-    background-color: #cccccc;
-    cursor: not-allowed;
-    transform: none;
-}
-/* Style khusus untuk tombol Stop */
-button.stop-button {
-    background-color: #dc3545; /* Warna merah */
-}
-button.stop-button:hover {
-    background-color: #c82333;
-}
-#photo-container {
-    width: 100%;
-    margin-top: 25px;
-    text-align: center;
-}
-h2 {
-    color: #444;
-    border-bottom: 2px solid #eee;
-    padding-bottom: 10px;
-    margin-bottom: 20px;
-}
-canvas {
+
+/*selesai layout  */
+
+/* bagian homepage */
+.page {
     display: none;
 }
-#photos {
-    margin-top: 20px;
+.page.active {
+    display: block;
+}
+
+/* Menu Profile User */
+.user-section {
+    background-image: linear-gradient(to bottom right, #1d4ed8, #f97316);
+    color: white;
+    padding: 24px 16px 80px;
+    position: relative;
+    overflow: hidden;
+}
+
+.user-section::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 150%;
+    height: 50px;
+    background: #e9ecef;
+    border-top-left-radius: 100%;
+    border-top-right-radius: 100%;
+}
+.user-detail {
     display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    z-index: 1;
+}
+.user-identity {
+    display: flex;
+    align-items: center;
+}
+.user-detail .avatar img {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+}
+.user-detail .user-info {
+    margin-left: 16px;
+}
+.user-detail .user-info h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+.user-detail .user-info span {
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* --- Tombol Logout --- */
+.logout-button a {
+    color: white;
+    font-size: 24px;
+    text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.3s;
+}
+.logout-button a:hover {
+    opacity: 1;
+}
+
+/* Icon Menu Navigation */
+.menu-section-container {
+    padding: 0 16px;
+    margin-top: -60px;
+    position: relative;
+    z-index: 10;
+}
+
+.list-menu {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.item-menu {
+    text-align: center;
+}
+.item-menu a {
+    font-size: 24px; /* Ukuran ikon diatur di sini */
+    text-decoration: none;
+}
+.item-menu .menu-name {
+    font-size: 0.8rem;
+    margin-top: 8px;
+    font-weight: 500;
+    color: #4b5563;
+}
+.text-green {
+    color: #28a745;
+}
+.text-danger {
+    color: #dc3545;
+}
+.text-warning {
+    color: #ffc107;
+}
+.text-orange {
+    color: #fd7e14;
+}
+
+/* card attandance */
+.presence-section-container {
+    padding: 0 16px;
+    margin-top: 16px;
+}
+.today-presence .card {
+    border: none;
+    border-radius: 12px;
+    color: white;
+    padding: 12px;
+}
+.bg-green-presence {
+    background-color: #22c55e;
+}
+.bg-red-presence {
+    background-color: #ef4444;
+}
+.presence-content {
+    display: flex;
+    align-items: center;
     justify-content: center;
+    gap: 12px;
 }
-#photos img {
-    max-width: 150px;
-    border: 3px solid #fff;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    transform: scaleX(-1);
+.icon-presence {
+    font-size: 28px;
 }
+.presence-detail {
+    text-align: left;
+}
+.presence-detail h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+.presence-detail span {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+/*selesai bagian homepage  */
