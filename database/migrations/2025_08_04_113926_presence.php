@@ -14,18 +14,15 @@ return new class extends Migration
         Schema::create('presence', function (Blueprint $table) {
             $table->id();
             $table->foreignId('users_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('locations_id')->nullable()->constrained('locations')->onDelete('set null');
             $table->timestamp('masuk');
-            $table->decimal('masuk_latitude', 10, 8)->nullable();
-            $table->decimal('masuk_longitude', 11, 8)->nullable();
             $table->timestamp('pulang');
             $table->date('tanggal');
-            $table->decimal('pulang_latitude', 10, 8)->nullable();
-            $table->decimal('pulang_longitude', 11, 8)->nullable();
             $table->string('status')->nullable();
+            $table->string('foto_masuk')->nullable();
+            $table->string('foto_pulang')->nullable();
             $table->timestamps();
             
-            
+            $table->unique(['users_id','tanggal']);
             
 
             

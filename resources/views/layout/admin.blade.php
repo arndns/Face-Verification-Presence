@@ -12,7 +12,7 @@
     
 
 
-    <title>@yield('title','Dashboard')ADMIN</title>
+    <title>@yield('title','Dashboard')</title>
     @vite(['resources/css/admin.css', 'resource/js/app.js', 'resources/sass/app.scss', 'resources/js/admin.js'])
 </head>
 

@@ -14,16 +14,6 @@ class User extends Seeder
      */
     public function run(): void
     {
-            ModelsUser::firstOrCreate(
-            ['email' => 'owner@example.com'],
-            [
-                'nama' => 'Nuansa Owner',
-                'password' => Hash::make('password123'),
-                'role' => 'owner',
-                'email_verified_at' => now(),
-            ]
-        );
-
         ModelsUser::firstOrCreate(
             ['email' => 'admin@example.com'],
             [

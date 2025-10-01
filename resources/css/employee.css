@@ -91,7 +91,7 @@ body {
 
 /* Menu Profile User */
 .user-section {
-    background-image: linear-gradient(to bottom right, #1d4ed8, #f97316);
+    background-image: linear-gradient(to bottom right, #1e90ff, #ff8c00);
     color: white;
     padding: 24px 16px 80px;
     position: relative;
@@ -230,3 +230,38 @@ body {
     font-weight: 500;
 }
 /*selesai bagian homepage  */
+
+/* halaman camera */
+
+/* header camera */
+.appHeader {
+    background: linear-gradient(to right, #1e90ff, #ff8c00);
+    top: 0;
+    z-index: 10;
+}
+
+/* camera style */
+.camera-capture,
+.camera-capture video {
+    display: inline-block;
+    width: 100% !important;
+    margin: auto;
+    height: auto !important;
+    border-radius: 10px;
+    object-fit: cover;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.camera-capture video {
+    transform: scaleX(-1);
+    -webkit-transform: scaleX(-1);
+}
+
+.action-button {
+    transition: all 0.2s ease-in-out;
+}
+
+.action-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}

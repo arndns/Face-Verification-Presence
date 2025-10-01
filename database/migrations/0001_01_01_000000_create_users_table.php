@@ -18,9 +18,10 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('jabatan')->nullable();
+            $table->string('foto')->nullable();
             $table->string('no_tilpun')->nullable();
             $table->string('password');
-            $table->enum('role',['employee', 'admin', 'owner'])->default('employee');
+            $table->enum('role',['employee', 'admin'])->default('employee');
             $table->rememberToken();
             $table->timestamps();
 

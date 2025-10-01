@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}">
 
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js"></script>
 
 
     @vite(['resource/js/app.js', 'resources/sass/app.scss', 'resources\css\employee.css', 'resources/js/employee.js'])
@@ -24,6 +25,8 @@
         <div class="spinner-border text-primary" role="status"></div>
     </div>
 
+    @yield('header')
+
     <!-- Konten Halaman (Akan berubah-ubah) -->
     <main id="main-content">
         @yield('content')
@@ -34,7 +37,7 @@
     {{-- menu footer --}}
     <div class="app-bottom-menu">
 
-        <a href="{{route('employee.index')}}" class="item active">
+        <a href="/employee" class="item {{request()->is('employee')?'active':''}}">
             <i class="fa-solid fa-home"></i>
             <strong>Home</strong>
         </a>
