@@ -13,7 +13,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use  HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -28,6 +28,7 @@ class User extends Authenticatable
         'jabatan',
         'no_tilpun',
         'email',
+        'foto',
     ];
 
     /**
@@ -77,8 +78,9 @@ class User extends Authenticatable
         return in_array($this->role, $roles);
     }
 
-    public function presences(): HasMany
+     public function presences()
     {
-        return $this->hasMany(presence::class);
+        return $this->hasMany(Presence::class);
     }
+
 }

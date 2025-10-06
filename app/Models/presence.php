@@ -2,42 +2,30 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class presence extends Model
+class Presence extends Model
 {
-    use HasFactory;
+    protected $table = 'presence';
 
-    /**
-     * Atribut yang dapat diisi secara massal.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'user_id',
+        'jam_masuk',
+        'jam_pulang',
         'tanggal',
-        'location_id',
-        'masuk',
-        'masuk_latitude',
-        'masuk_longitude',
-        'pulang',
-        'pulang_latitude',
-        'pulang_longitude',
         'status',
+        'foto_masuk',
+        'foto_pulang',
+        'lokasi_masuk',
+        'lokasi_keluar',
     ];
 
-    /**
-     * Mendefinisikan bahwa sebuah Presence dimiliki oleh seorang User.
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
+     protected $casts = [
+        'tanggal' => 'date',
+    ];
 
-    public function location(): BelongsTo
-    {
-        return $this->belongsTo(location::class);
+    public function user(){
+        return $this->belongsTo(user::class);
+    
     }
 }

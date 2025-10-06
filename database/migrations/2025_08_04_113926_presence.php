@@ -13,19 +13,18 @@ return new class extends Migration
     {
         Schema::create('presence', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('users_id')->constrained('users')->onDelete('cascade');
-            $table->timestamp('masuk');
-            $table->timestamp('pulang');
+            $table->time('jam_masuk');
+            $table->time('jam_pulang')->nullable();
             $table->date('tanggal');
             $table->string('status')->nullable();
-            $table->string('foto_masuk')->nullable();
+            $table->string('foto_masuk');
             $table->string('foto_pulang')->nullable();
+            $table->string('lokasi_masuk');
+            $table->string('lokasi_keluar')->nullable();
+            $table->foreignId('user_id')->constrained('users');
             $table->timestamps();
             
-            $table->unique(['users_id','tanggal']);
-            
 
-            
         });
     }
 

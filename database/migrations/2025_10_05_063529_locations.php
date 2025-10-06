@@ -11,13 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('face_data', function (Blueprint $table) {
+        Schema::create('locations', function (Blueprint $table){
             $table->id();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->text('face_descriptor'); 
-            $table->string('image_path'); 
+            $table->string('kota');
+            $table->string('alamat');
+            $table->string('latitude');
+            $table->string('longitude');
+            $table->integer('radius');
+            $table->boolean('is_used');
             $table->timestamps();
         });
+
     }
 
     /**
@@ -25,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('face_data');
+        Schema::dropIfExists('locations');
     }
 };

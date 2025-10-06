@@ -7,10 +7,6 @@ use App\Http\Controllers\OwnerController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    if (auth()->check()) {
-        $role = auth()->user()->role;
-        return redirect("/{$role}");
-    }
     return redirect('/login');
 });
 

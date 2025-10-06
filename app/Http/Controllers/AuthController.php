@@ -14,55 +14,65 @@ class AuthController extends Controller
         return view('Login.login');
     }
 
-    public function store(Request $request){
+    public function store(Request $request)
+    {
         
-        $username = Validator::make($request->all(),[
+        $validator = Validator::make($request->all(), [
             'username' => 'required|string',
             'password' => 'required'
-        ],[
-
-            'username.required' => 'NIK harus diisi',
-            'password.required' => 'Password harus diisi',
+        ], [
+            'username.required' => 'Username harus diisi.',
+            'password.required' => 'Password harus diisi.',
         ]);
 
-        
-        if ($username->fails()) {
+        if ($validator->fails()) {
             return back()
-                ->withErrors($username)
+                ->withErrors($validator)
                 ->withInput($request->except('password'));
         }
+
         $username = $request->input('username');
         $password = $request->input('password');
         
         $user = null;
+        // Cek format input sekali dan simpan hasilnya
+        $isEmail = filter_var($username, FILTER_VALIDATE_EMAIL);
 
-        //mengecek username termasuk email atau tidak 
-         if (filter_var($username, FILTER_VALIDATE_EMAIL)) {
-            // Jika format email, cari berdasarkan email untuk admin/owner
+        // 2. Cari Pengguna Berdasarkan Format Input
+        if ($isEmail) {
+            // Jika formatnya email, cari user admin/owner
             $user = User::where('email', $username)
-                       ->whereIn('role', ['admin', 'owner'])
-                       ->first();
+                        ->whereIn('role', ['admin', 'owner'])
+                        ->first();
         } else {
-            // Jika bukan email, cari berdasarkan NIK untuk karyawan
+            // Jika bukan email, cari user employee berdasarkan NIK
             $user = User::where('nik', $username)
-                       ->where('role', 'employee')
-                       ->first();
+                        ->where('role', 'employee')
+                        ->first();
         }
 
-        // Verifikasi user dan password
-        if (!$user || !Hash::check($password, $user->password)) {
+        // 3. Pengecekan Eksistensi Pengguna (Dengan Pesan Terpisah)
+        if (!$user) {
+            // Tentukan pesan error berdasarkan format input yang dicoba
+            $errorMessage = $isEmail
+                ? 'Email yang anda masukkan kurang tepat'
+                : 'NIK yang anda masukkan kurang tepat';
+
             return back()
-                ->withErrors(['username' => 'NIK atau password salah'])
+                ->withErrors(['username' => $errorMessage])
                 ->withInput($request->except('password'));
         }
 
-        // Login user
+        // 4. Pengecekan Password (Jika pengguna ditemukan)
+        if (!Hash::check($password, $user->password)) {
+            return back()
+                ->withErrors(['password' => 'Password yang anda masukkan kurang tepat'])
+                ->withInput($request->except('password'));
+        }
+
+        // 5. Jika Semua Berhasil: Login dan Redirect
         Auth::login($user, $request->boolean('remember'));
-
-        // Regenerate session untuk keamanan
         $request->session()->regenerate();
-
-        // Redirect berdasarkan role tanpa menampilkan role di URL
         return $this->redirectAfterLogin($user->role);
     }
 
@@ -75,11 +85,14 @@ class AuthController extends Controller
 
     private function redirectAfterLogin(string $role): \Illuminate\Http\RedirectResponse
     {
-        return match ($role) {
-            'admin' => redirect()->intended('/admin'),
-            'employee' => redirect()->intended('/employee'),
-            default => redirect()->intended('/'),
-        };
+         switch ($role) {
+            case 'admin':
+                return redirect()->route('admin.index');
+            case 'employee':
+                return redirect()->route('employee.index');
+            default:
+                return redirect('/');
+        }
     }
 
     

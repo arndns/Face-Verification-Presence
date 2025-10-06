@@ -1,3 +1,10 @@
+// modal peringatan
+document.addEventListener("DOMContentLoaded", function () {
+    var errorModalElement = document.getElementById("errorModal");
+    var errorModal = new bootstrap.Modal(errorModalElement);
+    errorModal.show();
+});
+
 // loader halaman pegawai
 window.addEventListener("load", function () {
     const loader = document.getElementById("loader");
@@ -18,12 +25,12 @@ document.querySelector(".goBack").addEventListener("click", () => {
 
 // camera open
 Webcam.set({
-    height:520,
-    width:720,
-    image_format:'jpeg',
-    jpeg_quality:80, 
+    height: 520,
+    width: 720,
+    image_format: "jpeg",
+    jpeg_quality: 80,
 });
-Webcam.attach('.camera-capture');
+Webcam.attach(".camera-capture");
 
 // input lokasi
 var location = document.getElementById("location");
@@ -31,10 +38,8 @@ if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
 }
 
-function successCallback(position){
-    location.value = position.coords.latitude + "," + position.coords.longitude ;
-} 
-
-function errorCallback(){
-
+function successCallback(position) {
+    location.value = position.coords.latitude + "," + position.coords.longitude;
 }
+
+function errorCallback() {}

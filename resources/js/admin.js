@@ -25,4 +25,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 });
 
-
+// modal peringatan
+document.addEventListener("DOMContentLoaded", function () {
+    var errorModalElement = document.getElementById("errorModal");
+    var errorModal = new bootstrap.Modal(errorModalElement);
+    errorModal.show();
+});
