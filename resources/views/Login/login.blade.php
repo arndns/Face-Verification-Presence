@@ -28,8 +28,6 @@
                             <h3 class="mb-1 fw-bold">Selamat Datang Kembali</h3>
                             <p class="text-muted">Silakan masukkan NIK dan password</p>
                         </div>
-
-
                         <!-- Form Login -->
                         <form id="loginForm" class="needs-validation" novalidate action="{{ route('login') }}"
                             method="POST">
