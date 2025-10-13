@@ -1,20 +1,23 @@
 @extends('layout.admin')
 @section('title', 'Lokasi')
 @section('content')
-<!-- Tabel Data -->
+    <!-- Tabel Data -->
     <div class="container mt-5">
         <div class="row">
             <div class="col-12">
                 <!-- Menampilkan Pesan SUKSES dengan Alert Bootstrap -->
                 @if (session('success'))
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="bi bi-check-circle-fill me-2"></i>
-                        <strong>Berhasil!</strong> {{ session('success') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
+                    <div class="alert alert-success alert-dismissible fade show">{{ session('success') }}<button
+                            type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
+                @elseif(session('error'))
+                    <div class="alert alert-danger alert-dismissible fade show">{{ session('error') }}<button type="button"
+                            class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
+                @elseif(session('info'))
+                    <div class="alert alert-info alert-dismissible fade show">{{ session('info') }}<button type="button"
+                            class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
                 @endif
                 <div class="table-container">
-                    <h4 class="mb-4">Data Pegawai</h4>
+                    <h4 class="mb-4">Daftar Lokasi</h4>
                     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                         <!-- Tombol Tambah Data -->
                         <a href="{{ route('location.create') }}"class="btn btn-success">Tambah Data</a>
@@ -41,23 +44,23 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($lokasi as $lokasi_kantor)
+                                @forelse ($locations as $location)
                                     <tr>
-                                        <td>{{ ($lokasi->currentPage() - 1) * $lokasi->perPage() + $loop->iteration }}</td>
-                                        <td>{{ $lokasi_kantor->kota }}</td>
-                                        <td>{{ $lokasi_kantor->alamat }}</td>
-                                        <td>{{ $lokasi_kantor->latitude }}</td>
-                                        <td>{{ $lokasi_kantor->longitude }}</td>
-                                        <td>{{ $lokasi_kantor->radius }}</td>
+                                        <td>{{ ($locations->currentPage() - 1) * $locations->perPage() + $loop->iteration }}
+                                        </td>
+                                        <td>{{ $location->kota }}</td>
+                                        <td>{{ $location->alamat }}</td>
+                                        <td>{{ $location->latitude }}</td>
+                                        <td>{{ $location->longitude }}</td>
+                                        <td>{{ $location->radius }}</td>
                                         <td class="align-middle">
                                             <div
                                                 class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
 
-                                                <a href=""
+                                                <a href="{{ route('location.edit', $location->id) }}"
                                                     class="btn btn-sm btn-warning">EDIT</a>
 
-                                                <form action="" method="POST"
-                                                    class="mb-0">
+                                                <form action="{{route('location.delete', $location->id)}}" method="POST" class="mb-0">
                                                     @csrf
                                                     @method('DELETE')
 
@@ -80,11 +83,10 @@
                     </div>
                     {{-- Link Paginasi --}}
                     <div class="d-flex justify-content-center mt-3">
-                        {!! $lokasi->appends(request()->query())->links() !!}
+                        {!! $locations->appends(request()->query())->links() !!}
                     </div>
                 </div>
             </div>
         </div>
     </div>
 @endsection
-

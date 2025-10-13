@@ -15,7 +15,6 @@ window.addEventListener("load", function () {
 });
 // selesai
 
-// page camera
 
 // header camera
 document.querySelector(".goBack").addEventListener("click", () => {
@@ -23,23 +22,5 @@ document.querySelector(".goBack").addEventListener("click", () => {
     window.history.back();
 });
 
-// camera open
-Webcam.set({
-    height: 520,
-    width: 720,
-    image_format: "jpeg",
-    jpeg_quality: 80,
-});
-Webcam.attach(".camera-capture");
 
-// input lokasi
-var location = document.getElementById("location");
-if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
-}
 
-function successCallback(position) {
-    location.value = position.coords.latitude + "," + position.coords.longitude;
-}
-
-function errorCallback() {}

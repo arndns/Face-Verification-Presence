@@ -81,16 +81,6 @@
                                 @enderror
                             </div>
 
-                            <!-- Field Password -->
-                            <div class="mb-4">
-                                <label for="password" class="form-label">Password</label>
-                                <input type="password" name="password" id="password"
-                                    class="form-control @error('password') is-invalid @enderror"
-                                    placeholder="Masukkan password">
-                                @error('password')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
 
                             <!-- Tombol Aksi -->
                             <div class="d-flex justify-content-end gap-2 mt-4">

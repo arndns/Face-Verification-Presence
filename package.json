@@ -19,6 +19,7 @@
         "vite-plugin-static-copy": "^3.1.1"
     },
     "dependencies": {
-        "bootstrap-icons": "^1.13.1"
+        "bootstrap-icons": "^1.13.1",
+        "face-api.js": "^0.22.2"
     }
 }
