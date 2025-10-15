@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}">
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js"></script>
-    <script src="{{asset('assets/js/halaman presensi/face-api.min.js')}}"></script>
     @vite([ 'resources/js/app.js', 'resources/js/employee.js', 'resources/css/employee.css', 'resources/css/app.css'])
 </head>
 

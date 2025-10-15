@@ -121,61 +121,47 @@
             ]);
         }
 
-        /* =================== CAMERA + OVERLAY =================== */
         function startCamera() {
             const wrap = document.querySelector(".camera-capture");
             if (!wrap) return;
-            wrap.querySelector("span")?.remove(); // hapus teks "Memuat Kamera..."
+            wrap.querySelector("span")?.remove();
 
-            // Pasang stream (tampilan responsif diatur lewat CSS & JS)
             Webcam.set({
                 width: 720,
                 height: 520,
                 image_format: "jpeg",
                 jpeg_quality: 90
             });
-
             Webcam.on("live", () => {
                 const video = wrap.querySelector("video");
                 if (!video) return;
 
-                // Paksa video memenuhi kotak (override CSS !important jika ada)
                 forceVideoFill(video);
-
-                // Buat/ambil canvas overlay dan samakan mirror dengan video
                 const overlay = ensureOverlay(wrap);
-
-                // Sinkronkan ukuran canvas ke ukuran kontainer (retina aware)
                 const sync = () => syncCanvasToBox(overlay, wrap);
                 sync();
                 new ResizeObserver(sync).observe(wrap);
 
-                // Mulai deteksi setelah metadata tersedia
                 if (video.readyState >= 2) runDetect(video, overlay, wrap);
                 else video.addEventListener("loadedmetadata", () => runDetect(video, overlay, wrap), {
                     once: true
                 });
             });
 
-            Webcam.on("error", err => {
-                console.error("Webcam error:", err);
-                wrap.insertAdjacentHTML("beforeend",
-                    "<span class='text-danger'>Tidak dapat mengakses kamera.</span>");
-            });
-
             Webcam.attach(".camera-capture");
         }
 
+
         function forceVideoFill(video) {
             video.setAttribute("playsinline", "");
-            video.style.setProperty('position', 'absolute', 'important');
-            video.style.setProperty('top', '0', 'important');
-            video.style.setProperty('left', '0', 'important');
-            video.style.setProperty('width', '100%', 'important');
-            video.style.setProperty('height', '100%', 'important');
-            video.style.setProperty('object-fit', 'cover', 'important'); // sesuai CSS kamu
-            video.style.setProperty('background', '#000', 'important');
-            // Video kamu sudah dimirror via CSS .camera-capture video { transform: scaleX(-1) }
+            video.style.setProperty("position", "absolute", "important");
+            video.style.setProperty("top", "0", "important");
+            video.style.setProperty("left", "0", "important");
+            video.style.setProperty("width", "100%", "important");
+            video.style.setProperty("height", "100%", "important");
+            video.style.setProperty("object-fit", "cover", "important");
+            video.style.setProperty("background", "#000", "important");
+
         }
 
         function ensureOverlay(wrap) {
@@ -185,16 +171,16 @@
                 c.id = "overlay";
                 wrap.appendChild(c);
             }
-            // Overlay ikut mirror supaya box tepat di wajah
-            c.style.position = "absolute";
-            c.style.top = 0;
-            c.style.left = 0;
-            c.style.width = "100%";
-            c.style.height = "100%";
-            c.style.pointerEvents = "none";
-            c.style.zIndex = 2;
-            c.style.transform = "scaleX(-1)";
-            c.style.webkitTransform = "scaleX(-1)";
+            Object.assign(c.style, {
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                pointerEvents: "none",
+                zIndex: 2
+
+            });
             return c;
         }
 
@@ -207,35 +193,86 @@
             canvas.width = Math.max(1, w * dpr);
             canvas.height = Math.max(1, h * dpr);
             const ctx = canvas.getContext("2d");
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // gambar pakai unit CSS pixel
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         }
 
-        /* =================== DETECTION LOOP =================== */
+
         function runDetect(video, canvas, box) {
-            const ctx = canvas.getContext("2d");
-            const opts = new faceapi.MtcnnOptions(); // default OK
+            const ctx = canvas.getContext('2d');
+            const opts = new faceapi.MtcnnOptions();
+            const dpr = window.devicePixelRatio || 1;
+
+            
+            const topExpression = (exp) => {
+                let best = {
+                    k: 'neutral',
+                    v: 0
+                };
+                for (const k in exp)
+                    if (exp[k] > best.v) best = {
+                        k,
+                        v: exp[k]
+                    };
+                return `${best.k} ${(best.v*100).toFixed(0)}%`;
+            };
 
             async function loop() {
                 if (video.readyState >= 2) {
-                    // Gunakan ukuran kontainer agar koordinat pas dengan tampilan
                     const drawSize = {
                         width: box.clientWidth,
                         height: box.clientHeight
                     };
 
-                    const res = await faceapi
+                    
+                    const det = await faceapi
                         .detectAllFaces(video, opts)
                         .withFaceLandmarks()
                         .withFaceExpressions();
 
-                    ctx.clearRect(0, 0, drawSize.width, drawSize.height);
+                    
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                    if (res.length) {
-                        const r = faceapi.resizeResults(res, drawSize);
-                        faceapi.draw.drawDetections(canvas, r);
-                        faceapi.draw.drawFaceLandmarks(canvas, r);
-                        faceapi.draw.drawFaceExpressions(canvas, r, 0.05);
+                    
+                    ctx.setTransform(-dpr, 0, 0, dpr, canvas.width, 0); 
+                    const r = faceapi.resizeResults(det, drawSize);
+
+                    
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#4FC3F7';
+                    for (const d of r) {
+                        const b = d.detection.box;
+                        ctx.strokeRect(b.x, b.y, b.width, b.height);
                     }
+                    
+                    faceapi.draw.drawFaceLandmarks(canvas, r);
+                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); 
+                    ctx.font = '14px sans-serif';
+                    ctx.fillStyle = '#00E676';
+                    ctx.strokeStyle = 'rgba(0,0,0,.55)';
+                    ctx.lineWidth = 3;
+
+                    for (const d of r) {
+                        // --- Ekspresi (teks normal, tak dibalik) ---
+                        const expText = topExpression(d.expressions);
+
+                       
+                        const score = (d.detection?.score ?? 0);
+                        const mtcnnText = `score ${(score*100).toFixed(0)}%`;
+                        const b = d.detection.box;
+                        const mirroredX = drawSize.width - (b.x + b.width);
+                        const tx = Math.max(4, mirroredX + 4);
+                        const ty1 = Math.max(16, b.y - 8); 
+                        const ty2 = Math.min(drawSize.height - 6, b.y + 16); 
+
+                        ctx.strokeText(expText, tx, ty1);
+                        ctx.fillText(expText, tx, ty1);
+
+                        ctx.strokeText(mtcnnText, tx, ty2);
+                        ctx.fillText(mtcnnText, tx, ty2);
+                    }
+
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
                 }
                 requestAnimationFrame(loop);
             }
