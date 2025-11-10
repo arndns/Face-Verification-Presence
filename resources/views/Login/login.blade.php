@@ -9,14 +9,14 @@
     <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}">
     <link rel="icon" href="{{ asset('assets/image/nuansa-laras-icon.ico') }}" type="image/x-icon">
     <title>Login</title>
-    @vite(['resources/scss/app.scss', 'resources/js/app.js', 'resources/css/login.css', 'resources/js/login.js', 'resources/css/app.css'])
+    @vite([ 'resources/css/login.css', 'resources/js/login.js', 'resources/css/app.css'])
 </head>
 
 <body>
     <div class="container">
 
         <div class="row login-container">
-            
+
             <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5 col-xxl-4">
                 <div class="card login-card">
                     <div class="card-body p-4 p-sm-5">
@@ -32,24 +32,21 @@
                         <form id="loginForm" class="needs-validation" novalidate action="{{ route('login') }}"
                             method="POST">
                             @csrf
-                            @if ($errors->any())
+                            @if (session('error'))
                                 <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                                    <strong>Oops! Terjadi Kesalahan:</strong>
-                                    <ul class="mb-0 mt-2">
-                                        @foreach ($errors->all() as $error)
-                                            <li>{{ $error }}</li>
-                                        @endforeach
-                                    </ul>
+                                    <div class="alert-message">{{ session('error') }}</div>
                                     <button type="button" class="btn-close" data-bs-dismiss="alert"
                                         aria-label="Close"></button>
                                 </div>
                             @endif
                             <!-- Input Email -->
                             <div class="form-floating mb-3">
-                                <input type="username"
-                                    class="form-control {{ $errors->has('username') ? 'error' : '' }}" type="text"
-                                    id="username" name="username" value="{{ old('username') }}"
+                                <input class="form-control {{ $errors->has('username') ? 'is-invalid' : '' }}"
+                                    type="text" id="username" name="username" value="{{ old('username') }}"
                                     placeholder="Masukkan NIK" autocomplete="username" required>
+                                @error('username')
+                                    <div class="error">{{ $message }}</div>
+                                @enderror
                                 <label for="username"><i class="fa-solid  fa-envelope me-2"></i>NIK</label>
                             </div>
 
@@ -57,7 +54,7 @@
                             <div class="input-group mb-3">
                                 <div class="form-floating flex-grow-1">
                                     <input type="password"
-                                        class="form-control {{ $errors->has('password') ? 'error' : '' }}"
+                                        class="form-control {{ $errors->has('password') ? 'is-invalid' : '' }}"
                                         id="password" placeholder="Password" name="password" required
                                         placeholder="Masukkan password" autocomplete="current-password">
                                     <label for="password"><i class="fa-solid fa-lock me-2"></i>Password</label>

@@ -12,6 +12,18 @@
                         <strong>Berhasil!</strong> {{ session('success') }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
+                @elseif (session('warning'))
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>Peringatan!</strong> {{ session('warning') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                @elseif (session('danger') || session('error'))
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-x-circle-fill me-2"></i>
+                        <strong>Gagal!</strong> {{ session('danger') ?? session('error') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
                 @endif
                 <div class="table-container">
                     <h4 class="mb-4">Data Pegawai</h4>
@@ -30,8 +42,10 @@
                     <div class="table-responsive">
                         <table class="table table-hover align-middle">
                             <thead>
-                                <tr>
+                                <tr class="text-center">
                                     <th>NO</th>
+                                    <th>FACE ID</th>
+                                    <th>FOTO</th>
                                     <th>NIK</th>
                                     <th>NAMA</th>
                                     <th>EMAIL</th>
@@ -41,14 +55,37 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($users as $user)
-                                    <tr>
-                                        <td>{{ ($users->currentPage() - 1) * $users->perPage() + $loop->iteration }}</td>
+                                @forelse ($employee as $user)
+                                    <tr class="text-center">
+                                        <td>{{ ($employee->currentPage() - 1) * $employee->perPage() + $loop->iteration }}
+                                        </td>
+                                        <td><a href="{{ route('admin.faceid', $user->id) }}"
+                                                class="btn btn-primary btn-sm rounded-circle rekam-wajah-btn"
+                                                style="width:36px; height: 36px; position: relative;"
+                                                data-bs-toggle="tooltip" data-bs-placement="top" title="Rekam Wajah"
+                                                data-embedding-exists="{{ $user->face_embedding ? 'true' : 'false' }}"
+                                                data-user-name="{{ $user->nama }}">
+
+                                                <i class="fas fa-camera"
+                                                    style="position: absolute;  top: 50%; left: 50%; transform: translate(-50%, -50%); "></i>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            @if ($user->foto)
+                                                <img src="{{ Storage::url($user->foto) }}" alt="avatar"
+                                                    class="imaged w64 rounded-circle"
+                                                    style="width: 100px; height: 100px; object-fit: cover;">
+                                            @else
+                                                <img src="{{ asset('assets/image/profil-picture.png') }}" alt="avatar"
+                                                    class="imaged w64 rounded-circle"
+                                                    style="width: 100px; height: 100px; object-fit: cover;">
+                                            @endif
+                                        </td>
                                         <td>{{ $user->nik }}</td>
                                         <td>{{ $user->nama }}</td>
                                         <td>{{ $user->email }}</td>
                                         <td>{{ $user->jabatan }}</td>
-                                        <td>{{ $user->no_tilpun }}</td>
+                                        <td>{{ $user->no_hp }}</td>
                                         <td class="align-middle">
                                             <div
                                                 class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
@@ -80,10 +117,39 @@
                     </div>
                     {{-- Link Paginasi --}}
                     <div class="d-flex justify-content-center mt-3">
-                        {!! $users->appends(request()->query())->links() !!}
+                        {!! $employee->appends(request()->query())->links() !!}
                     </div>
                 </div>
             </div>
         </div>
     </div>
+@endsection
+
+@section('script')
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const successMessage = sessionStorage.getItem('showSuccessModal');
+            if (successMessage) {
+                Swal.fire({
+                    title: 'Sukses!',
+                    text: successMessage,
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+                sessionStorage.removeItem('showSuccessModal');
+                return; 
+            }
+            const warningMessage = sessionStorage.getItem('showWarningModal');
+            if (warningMessage) {
+                Swal.fire({
+                    title: 'Status Tidak Diketahui',
+                    text: warningMessage,
+                    icon: 'warning',
+                    confirmButtonText: 'OK'
+                });
+                sessionStorage.removeItem('showWarningModal');
+            }
+        });
+    </script>
 @endsection

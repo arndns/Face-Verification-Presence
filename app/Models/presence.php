@@ -2,30 +2,29 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Presence extends Model
 {
-    protected $table = 'presence';
-
-    protected $fillable = [
-        'user_id',
-        'jam_masuk',
-        'jam_pulang',
-        'tanggal',
-        'status',
-        'foto_masuk',
-        'foto_pulang',
-        'lokasi_masuk',
-        'lokasi_keluar',
+    use HasFactory;
+    protected $casts = [
+        'waktu_check_in' => 'datetime',
+        'waktu_check_out' => 'datetime',
     ];
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
 
-     protected $casts = [
-        'tanggal' => 'date',
-    ];
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
+    }
 
-    public function user(){
-        return $this->belongsTo(user::class);
-    
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Location::class);
     }
 }

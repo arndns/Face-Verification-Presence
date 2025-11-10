@@ -50,7 +50,7 @@
                                             class="fas fa-location-arrow me-2 text-primary"></i>Latitude</label>
                                     <input type="text" name="latitude" id="latitude"
                                         class="form-control @error('latitude') is-invalid @enderror"
-                                        placeholder="Mendapatkan..." value="{{ old('latitude', $location->latitude) }}" readonly>
+                                        placeholder="Mendapatkan..." value="{{ old('latitude', $location->latitude) }}" >
                                     @error('latitude')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -61,7 +61,7 @@
                                             class="fas fa-location-arrow me-2 text-primary"></i>Longitude</label>
                                     <input type="text" name="longitude" id="longitude"
                                         class="form-control @error('longitude') is-invalid @enderror"
-                                        placeholder="Mendapatkan..." value="{{ old('longitude', $location->longitude) }}" readonly>
+                                        placeholder="Mendapatkan..." value="{{ old('longitude', $location->longitude) }}" >
                                     @error('longitude')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror

@@ -9,18 +9,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Location extends Model
 {
     use HasFactory;
+    protected $guarded = ['id'];
 
-    protected $fillable = [
-        'kota',
-        'alamat',
-        'latitude',
-        'longitude',
-        'radius',
-    ];
-
+    public function employees(): HasMany
+    {
+        return $this->hasMany(Employee::class);
+    }
 
     public function presences(): HasMany
     {
-        return $this->hasMany(presence::class);
+        return $this->hasMany(Presence::class);
     }
 }

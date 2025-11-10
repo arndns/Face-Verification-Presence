@@ -21,14 +21,9 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
-        'nama',
+        'username',
         'password',
         'role',
-        'nik',
-        'jabatan',
-        'no_tilpun',
-        'email',
-        'foto',
     ];
 
     /**
@@ -53,29 +48,20 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function employee()
+    {
+        return $this->hasOne(Employee::class, 'user_id');
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
     }
 
-    public function isOwner(): bool
-    {
-        return $this->role === 'owner';
-    }
-
     public function isEmployee(): bool
     {
         return $this->role === 'employee';
-    }
-
-    public function hasRole(string $role): bool
-    {
-        return $this->role === $role;
-    }
-
-    public function hasAnyRole(array $roles): bool
-    {
-        return in_array($this->role, $roles);
     }
 
      public function presences()

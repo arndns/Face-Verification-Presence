@@ -20,7 +20,8 @@
 @section('content')
     <div class="p-4 ">
         <div class="w-100 mb-4">
-            <input type="hidden" id="location" placeholder="Menunggu lokasi...">
+            <input type="text
+            " id="location" placeholder="Menunggu lokasi...">
             <!-- Wadah tidak akan melebihi lebar .w-100 -->
             <div class="camera-capture text-muted"
                 style="position:relative;width:100%;max-width:720px;aspect-ratio:720/520;background:#000;overflow:hidden;border-radius:8px;">
@@ -35,20 +36,27 @@
                 <span id="button-text">Presensi Masuk</span>
             </button>
         </div>
-        <div class="w-100 mb-4">
+        {{-- <div class="w-100 mb-4">
             <button id="takeattandance"
                 class="w-100 btn btn-danger btn-lg fw-bold rounded-3 shadow d-flex align-items-center justify-content-center gap-3">
                 <i class="fa-solid fa-camera fa-lg"></i>
                 <span id="button-text">Presensi Pulang</span>
             </button>
+        </div> --}}
+        <div class="w-100 mb-4">
+            <div id="map"></div>
         </div>
     </div>
-    <div id="face-root" data-models="{{ asset('models') }}"></div>
 @endsection
 @section('style')
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         canvas {
             position: absolute;
+        }
+
+        #map {
+            height: 200px;
         }
     </style>
 
@@ -66,6 +74,19 @@
                         const longitude = position.coords.longitude;
                         locationInput.value = `${latitude},${longitude}`;
                         console.log("Lokasi berhasil didapat:", locationInput.value);
+
+
+                        const map = L.map('map').setView([latitude, longitude], 13);
+
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                            attribution: '© OpenStreetMap'
+                        }).addTo(map);
+
+
+                        L.marker([latitude, longitude]).addTo(map)
+                            .bindPopup("Lokasi Anda saat ini")
+                            .openPopup();
                     },
                     (error) => {
                         console.warn("Gagal mendapatkan lokasi:", error.message);
@@ -82,6 +103,13 @@
                             default:
                                 locationInput.value = "Terjadi kesalahan.";
                         }
+
+                        // Jika gagal dapat lokasi, tetap tampilkan peta default
+                        const map = L.map('map').setView([51.505, -0.09], 13);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            maxZoom: 19,
+                            attribution: '© OpenStreetMap'
+                        }).addTo(map);
                     }, {
                         enableHighAccuracy: true,
                         timeout: 10000,
@@ -202,7 +230,7 @@
             const opts = new faceapi.MtcnnOptions();
             const dpr = window.devicePixelRatio || 1;
 
-            
+
             const topExpression = (exp) => {
                 let best = {
                     k: 'neutral',
@@ -223,47 +251,46 @@
                         height: box.clientHeight
                     };
 
-                    
+
                     const det = await faceapi
                         .detectAllFaces(video, opts)
                         .withFaceLandmarks()
                         .withFaceExpressions();
 
-                    
+
                     ctx.setTransform(1, 0, 0, 1, 0, 0);
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                    
-                    ctx.setTransform(-dpr, 0, 0, dpr, canvas.width, 0); 
+
+                    ctx.setTransform(-dpr, 0, 0, dpr, canvas.width, 0);
                     const r = faceapi.resizeResults(det, drawSize);
 
-                    
+
                     ctx.lineWidth = 2;
                     ctx.strokeStyle = '#4FC3F7';
                     for (const d of r) {
                         const b = d.detection.box;
                         ctx.strokeRect(b.x, b.y, b.width, b.height);
                     }
-                    
+
                     faceapi.draw.drawFaceLandmarks(canvas, r);
-                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); 
+                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                     ctx.font = '14px sans-serif';
                     ctx.fillStyle = '#00E676';
                     ctx.strokeStyle = 'rgba(0,0,0,.55)';
                     ctx.lineWidth = 3;
 
                     for (const d of r) {
-                        // --- Ekspresi (teks normal, tak dibalik) ---
                         const expText = topExpression(d.expressions);
 
-                       
+
                         const score = (d.detection?.score ?? 0);
                         const mtcnnText = `score ${(score*100).toFixed(0)}%`;
                         const b = d.detection.box;
                         const mirroredX = drawSize.width - (b.x + b.width);
                         const tx = Math.max(4, mirroredX + 4);
-                        const ty1 = Math.max(16, b.y - 8); 
-                        const ty2 = Math.min(drawSize.height - 6, b.y + 16); 
+                        const ty1 = Math.max(16, b.y - 8);
+                        const ty2 = Math.min(drawSize.height - 6, b.y + 16);
 
                         ctx.strokeText(expText, tx, ty1);
                         ctx.fillText(expText, tx, ty1);

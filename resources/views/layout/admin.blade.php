@@ -4,10 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSRF Token untuk AJAX -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <!-- Favicon icon -->
     <link rel="icon" href="{{ asset('assets/image/nuansa-laras-icon.ico') }}" type="image/x-icon">
     <!-- Font Awesome untuk Ikon -->
     <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}">
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
     @vite(['resources/css/admin.css', 'resource/js/app.js', 'resources/sass/app.scss', 'resources/js/admin.js'])
 
@@ -31,7 +34,8 @@
             <ul class="list-unstyled components">
                 <li><a href="{{ route('admin.index') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
                 <li><a href="{{ route('admin.data') }}"><i class="fas fa-users"></i> Data Pegawai</a></li>
-                <li><a href="{{route('location.index')}}"><i class="fas fa-map-location-dot"></i> Lokasi Kantor</a></li>
+                <li><a href="{{ route('location.index') }}"><i class="fas fa-map-location-dot"></i> Lokasi Kantor</a>
+                </li>
                 <li><a href="#"><i class="fas fa-history"></i> Riwayat Presensi</a></li>
             </ul>
 
@@ -52,7 +56,7 @@
         <!-- Konten Utama (termasuk Navbar) -->
         <div id="content">
             <!-- Navbar yang kini berfungsi sebagai pembatas -->
-            <nav class="navbar navbar-expand-lg main-navbar">
+            <nav class="navbar navbar-expand-lg main-navbar fixed-top">
                 <div class="container-fluid p-0">
                     <button type="button" id="sidebarCollapse" class="btn btn-light rounded-circle p-2">
                         <img src="{{ asset('assets/image/nuansa-laras-icon.ico') }}" alt="Menu"
@@ -67,6 +71,10 @@
             <main class="main-content-area">
                 @yield('content')
             </main>
+            @yield('script')
+
+
+            @yield('style')
         </div>
         <div class="sidebar-backdrop"></div>
     </div>
