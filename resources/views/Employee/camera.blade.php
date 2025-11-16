@@ -437,10 +437,9 @@
                                 title: 'Verifikasi Berhasil!',
                                 text: 'Mengambil snapshot...'
                             });
-                            
 
-                            // Kirim FOTO ke controller 'presence'
-                            await sendClockInRequest(csrfToken);
+                            const snapshotData = takeSnapshot(video);
+                            await sendClockInRequest(csrfToken, snapshotData);
 
                         } else {
                             // GAGAL: Wajah tidak cocok
@@ -482,46 +481,52 @@
                 return dataUrl;
             }
 
-            async function sendClockInRequest(csrfToken) {
-                console.log('📤 Memulai proses pengiriman presensi (tanpa foto)...');
+            async function sendClockInRequest(csrfToken, snapshotData) {
+                console.log('?? Memulai proses pengiriman presensi dengan foto...');
 
                 if (!csrfToken) {
                     Swal.fire('Error', 'CSRF token tidak ditemukan. Refresh halaman.', 'error');
                     resetButton();
                     return;
                 }
+
                 Swal.update({
                     title: 'Mengirim Data Presensi...'
                 });
+
                 try {
                     const response = await fetch('/presence/store', {
                         method: 'POST',
-                        // Tidak perlu 'body'
                         headers: {
                             'X-CSRF-TOKEN': csrfToken,
                             'Accept': 'application/json',
                             'X-Requested-With': 'XMLHttpRequest',
-                        }
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            snapshot: snapshotData,
+                        }),
                     });
                     const data = await response.json();
+
                     if (!response.ok) {
-                        console.error('❌ Server error:', data);
+                        console.error('?? Server error:', data);
                         const errorMessage = data.error || data.message;
-                        throw new Error(errorMessage || `Server error (${response.status})`);
+                        throw new Error(errorMessage || Server error ());
                     }
 
-                    console.log('✅ Presensi berhasil!');
+                    console.log('? Presensi berhasil!');
                     Swal.fire({
                         icon: 'success',
                         title: 'Presensi Berhasil!',
-                        text: `Jam masuk Anda: ${data.jam_masuk}`,
+                        text: Jam masuk Anda: ,
                         allowOutsideClick: false
                     });
                     const button = document.getElementById('takeattandance');
                     const buttonText = document.getElementById('button-text');
                     if (buttonText) {
-                      buttonText.innerText = `Berhasil! (${data.jam_masuk})`;  
-                    } 
+                        buttonText.innerText = Berhasil! ();
+                    }
                     if (button) {
                         button.disabled = true;
                         button.classList.remove('btn-primary');
@@ -531,13 +536,12 @@
 
                     return data;
                 } catch (err) {
-                    console.error('❌ Terjadi kesalahan:', err);
+                    console.error('?? Terjadi kesalahan:', err);
                     Swal.fire('Error', err.message || 'Tidak dapat terhubung ke server.', 'error');
                     resetButton();
                 }
 
             }
-
             function resetButton() {
                 console.log('🔄 Reset tombol ke status awal');
                 isVerifying = false;
@@ -594,3 +598,4 @@
 
 
     @endsection
+

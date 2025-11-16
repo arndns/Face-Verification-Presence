@@ -79,6 +79,12 @@ Jalankan migrasi untuk membuat tabel-tabel yang dibutuhkan.
 php artisan migrate
 ```
 
+**5. Buat Symlink Storage**
+Perintah ini wajib dieksekusi sekali di setiap mesin/server baru agar file foto presensi dapat diakses melalui URL.
+```bash
+php artisan storage:link
+```
+
 **5. Jalankan Aplikasi**
 Jalankan server development Laravel.
 ```bash
