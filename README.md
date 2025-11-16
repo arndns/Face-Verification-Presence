@@ -51,46 +51,45 @@ Aplikasi ini memungkinkan pengguna untuk melakukan absensi dengan memindai wajah
 
 Berikut adalah langkah-langkah untuk menjalankan proyek ini di lingkungan lokal Anda.
 
-**1. Clone Repository**
-```bash
-git clone [URL_REPOSITORY_ANDA]
-cd Face-Verification-Presence
-```
+1. **Clone Repository**
+   ```bash
+   git clone [URL_REPOSITORY_ANDA]
+   cd Face-Verification-Presence
+   ```
 
-**2. Instal Dependensi**
-Pastikan Anda memiliki Composer terinstal.
-```bash
-composer install
-```
+2. **Instal Dependensi PHP & Node**
+   ```bash
+   composer install
+   npm install
+   ```
 
-**3. Konfigurasi Lingkungan**
-Salin file `.env.example` menjadi `.env` dan sesuaikan koneksi database Anda.
-```bash
-cp .env.example .env
-```
-Setelah itu, generate kunci aplikasi Laravel.
-```bash
-php artisan key:generate
-```
+3. **Konfigurasi Lingkungan**
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+   Lalu sesuaikan kredensial database, storage, dsb. di dalam `.env`.
 
-**4. Migrasi Database**
-Jalankan migrasi untuk membuat tabel-tabel yang dibutuhkan.
-```bash
-php artisan migrate
-```
+4. **Migrasi Database**
+   ```bash
+   php artisan migrate
+   ```
+   Gunakan `php artisan migrate --seed` bila ingin langsung memuat data contoh dari seeder (setelah Anda pastikan seeder sudah sesuai kebutuhan).
 
-**5. Buat Symlink Storage**
-Perintah ini wajib dieksekusi sekali di setiap mesin/server baru agar file foto presensi dapat diakses melalui URL.
-```bash
-php artisan storage:link
-```
+5. **Buat Symlink Storage**
+   Perintah ini wajib dijalankan sekali di setiap mesin/server baru agar foto presensi dapat diakses melalui URL.
+   ```bash
+   php artisan storage:link
+   ```
 
-**5. Jalankan Aplikasi**
-Jalankan server development Laravel.
-```bash
-php artisan serve
-```
-Aplikasi sekarang akan berjalan di `http://127.0.0.1:8000`.
+6. **Jalankan Mode Pengembangan**
+   Jalankan seluruh layanan dev (Laravel server, queue listener, dan Vite) dengan satu perintah:
+   ```bash
+   composer run dev
+   ```
+   Biarkan terminal tersebut aktif selama pengembangan. Jika Anda memilih menjalankan proses secara terpisah, gunakan `php artisan serve` dan `npm run dev` pada terminal berbeda.
+
+Aplikasi sekarang dapat diakses di `http://127.0.0.1:8000` dengan asset yang disajikan oleh Vite pada `http://localhost:5173`.
 
 ## Bagan Alur & Diagram
 
