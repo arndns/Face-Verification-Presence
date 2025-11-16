@@ -9,9 +9,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Presence extends Model
 {
     use HasFactory;
+    protected $fillable = ['employee_id', 'waktu_masuk', 'location_id', 'foto_masuk', 'waktu_pulang', 'shift_id', 'foto_pulang'  ];
     protected $casts = [
-        'waktu_check_in' => 'datetime',
-        'waktu_check_out' => 'datetime',
+        'waktu_masuk' => 'datetime',
+        'waktu_pulang' => 'datetime',
     ];
     public function employee(): BelongsTo
     {

@@ -10,8 +10,8 @@
                             class="imaged w64 rounded-circle">
                     </div>
                     <div class="user-info">
-                        <h2 id="user-name">{{ $user->nama }}</h2>
-                        <span id="user-role">{{ $user->jabatan }}</span>
+                        <h2 id="user-name">{{ $user->employee->nama }}</h2>
+                        <span id="user-role">{{ $user->employee->nik }}</span>
                     </div>
                 </div>
                 <div class="logout-button">

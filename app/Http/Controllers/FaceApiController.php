@@ -15,7 +15,7 @@ class FaceApiController extends Controller
         $hasEmbedding = Face_Embedding::where('employee_id', $id)->exists();
         if ($hasEmbedding) {
             return redirect()->route('admin.data')
-            ->with('warning', 'Pegawai sudah melakukan pengenalan wajah');
+                ->with('warning', 'Pegawai sudah melakukan pengenalan wajah');
         }
         $employee = Employee::findOrFail($id);
         return view('Admin.pegawai.faceid.face', [
@@ -50,11 +50,14 @@ class FaceApiController extends Controller
             ], 409); // 409 Conflict
         }
         try {
-            
+
+            $descriptorString = json_encode($request->descriptor);
+
             $embedding = Face_Embedding::create([
                 'employee_id' => $request->employee_id,
-                'descriptor'  => $request->descriptor,
+                'descriptor'  => $descriptorString,
             ]);
+
             Log::info('Sukses: Wajah berhasil disimpan untuk ID ' . $request->employee_id);
             return response()->json([
                 'success' => true,

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('face__embeddings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('employee_id')->constrained('employees')->onDelete('cascade');
-            $table->json('descriptor');
+            $table->text('descriptor');
             $table->timestamps();
         });
     }

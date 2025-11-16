@@ -9,10 +9,11 @@
     <link rel="icon" href="{{ asset('assets/image/nuansa-laras-icon.ico') }}" type="image/x-icon">
     <!-- Font Awesome untuk Ikon -->
     <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js"></script>
-    @vite([ 'resources/js/app.js', 'resources/js/employee.js', 'resources/css/employee.css', 'resources/css/app.css'])
+    @vite([ 'resources/js/employee.js', 'resources/css/employee.css', 'resources/css/app.css'])
 </head>
 
 <body>
