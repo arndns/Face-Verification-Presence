@@ -22,7 +22,7 @@
                     </div>
                     <div class="user-info">
                         <h2 id="user-name">{{ $employeeProfile->nama ?? $user->username }}</h2>
-                        <span id="user-role">{{ $employeeProfile->nik ?? '-' }}</span>
+                        <span id="user-role">{{ $employeeProfile->jabatan ?? '-' }}</span>
                         <div class="user-tags">
                             <span class="tag badge-face {{ $faceRegistered ? 'active' : '' }}">
                                 <i class="fa-solid fa-face-smile me-1"></i>

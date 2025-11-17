@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'face_recognition' => [
+        'threshold' => (float) env('FACE_RECOGNITION_THRESHOLD', 0.45),
+    ],
+
 ];
