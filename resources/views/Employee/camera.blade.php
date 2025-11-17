@@ -19,6 +19,12 @@
 @endsection
 @section('content')
     <div class="p-4 ">
+        @if (!$locationReady)
+            <div class="alert alert-warning d-flex align-items-center gap-2">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+                Lokasi kantor belum ditetapkan oleh admin. Presensi belum dapat dilakukan.
+            </div>
+        @endif
         <div class="w-100 mb-4">
             <input type="hidden" id="location" placeholder="Menunggu lokasi...">
             <!-- Wadah tidak akan melebihi lebar .w-100 -->
@@ -31,8 +37,15 @@
         <div class="w-100 mb-4">
             <button id="takeattandance"
                 class="w-100 btn btn-primary btn-lg fw-bold rounded-3 shadow d-flex align-items-center justify-content-center gap-3"
-                data-user-id="{{ $user->employee->id }}" disabled> <i class="fa-solid fa-camera fa-lg"></i>
-                <span id="button-text">Wajah Tidak Terdeteksi</span>
+                data-user-id="{{ $user->employee->id }}" data-location-ready="{{ $locationReady ? '1' : '0' }}"
+                @if (!$locationReady) disabled @endif> <i class="fa-solid fa-camera fa-lg"></i>
+                <span id="button-text">
+                    @if ($locationReady)
+                        Wajah Tidak Terdeteksi
+                    @else
+                        Lokasi kantor belum siap
+                    @endif
+                </span>
             </button>
         </div>
         {{-- <div class="w-100 mb-4">
@@ -84,6 +97,11 @@
                 const attendanceButton = document.getElementById('takeattandance');
                 if (!attendanceButton) {
                     console.log("Mode absensi tidak aktif.");
+                    return;
+                }
+                const locationReady = attendanceButton.dataset.locationReady === '1';
+                if (!locationReady) {
+                    console.log("Lokasi kantor belum ditetapkan, presensi dinonaktifkan.");
                     return;
                 }
                 // Jalankan inisialisasi
@@ -510,22 +528,23 @@
                     const data = await response.json();
 
                     if (!response.ok) {
-                        console.error('?? Server error:', data);
+                        console.error('🚨 Server error:', data);
                         const errorMessage = data.error || data.message;
-                        throw new Error(errorMessage || Server error ());
+                        throw new Error(errorMessage || `Server error (${response.status})`);
                     }
 
-                    console.log('? Presensi berhasil!');
+                    console.log('✅ Presensi berhasil!');
                     Swal.fire({
                         icon: 'success',
-                        title: 'Presensi Berhasil!',
-                        text: Jam masuk Anda: ,
+                        title: data.status === 'clock_out' ? 'Presensi Pulang Berhasil!' : 'Presensi Masuk Berhasil!',
+                        text: `Jam tercatat: ${data.recorded_at || data.waktu_masuk || data.waktu_pulang}`,
                         allowOutsideClick: false
                     });
                     const button = document.getElementById('takeattandance');
                     const buttonText = document.getElementById('button-text');
                     if (buttonText) {
-                        buttonText.innerText = Berhasil! ();
+                        const timeText = data.recorded_at || data.waktu_masuk || data.waktu_pulang || '-';
+                        buttonText.innerText = `Berhasil! (${timeText})`;
                     }
                     if (button) {
                         button.disabled = true;
@@ -598,4 +617,3 @@
 
 
     @endsection
-

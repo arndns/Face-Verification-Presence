@@ -6,6 +6,7 @@ use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\FaceApiController;
 use App\Http\Controllers\LocationController;
 use App\Http\Controllers\OwnerController;
+use App\Http\Controllers\ShiftController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -36,6 +37,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/admin/location/{location}/edit', [LocationController::class, 'edit'])->name('location.edit');
         Route::patch('/admin/location/{location}/update', [LocationController::class, 'update'])->name('location.update');
         Route::delete('/admin/location/{location}/delete', [LocationController::class, 'destroy'])->name('location.delete');
+
+        Route::resource('/admin/shifts', ShiftController::class)->except(['show']);
     });
 
     Route::middleware('role:employee')->group(function () {

@@ -25,12 +25,12 @@ class LocationController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'kota' => 'required|string|max:255',
-            'unique:locations,kota',
-            'alamat' => 'required|string|max:255',
-            'latitude' => 'required',
-            'longitude' => 'required',
-            'radius' => 'required|numeric',
+            'kota' => ['required', 'string', 'max:255', 'unique:locations,kota'],
+            'alamat' => ['required', 'string', 'max:255'],
+            'latitude' => ['required'],
+            'longitude' => ['required'],
+            'radius' => ['required', 'numeric'],
+            'timezone' => ['required', 'timezone'],
         ]);
 
         try {
@@ -66,9 +66,10 @@ class LocationController extends Controller
         $rules = [
             'kota'      => ['sometimes', 'filled', 'string', 'max:255', Rule::unique('locations', 'kota')->ignore($location->id)],
             'alamat'    => ['sometimes', 'filled', 'string', 'max:255'],
-            'latitude'  => ['sometimes', 'filled', 'string',],
-            'longitude' => ['sometimes', 'filled', 'string',],
+            'latitude'  => ['sometimes', 'filled', 'string'],
+            'longitude' => ['sometimes', 'filled', 'string'],
             'radius'    => ['sometimes', 'filled', 'numeric', 'min:0'],
+            'timezone'  => ['sometimes', 'filled', 'timezone'],
         ];
 
         $data = $request->validate($rules);
