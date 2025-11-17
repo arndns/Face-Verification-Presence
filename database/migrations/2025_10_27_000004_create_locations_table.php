@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('latitude');
             $table->string('longitude');
             $table->integer('radius');
+            $table->string('timezone')->default('Asia/Jakarta');
             $table->timestamps();
         });
     }

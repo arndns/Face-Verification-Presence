@@ -18,6 +18,23 @@ Aplikasi ini memungkinkan pengguna untuk melakukan absensi dengan memindai wajah
 *   **Pencatatan Kehadiran:** Log atau riwayat kehadiran yang tercatat otomatis.
 *   **Dasbor Pengguna:** Tampilan riwayat dan status kehadiran masing-masing pengguna.
 
+## Arsitektur & Komponen
+
+| Lapisan | Lokasi | Rangkuman |
+| --- | --- | --- |
+| **Routing** | `routes/web.php`, `routes/api.php` | Routing web memakai middleware `auth` dan `role:{admin/employee}`, sedangkan API publik saat ini hanya memuat endpoint `POST /api/save-embedding`. |
+| **Controller Admin** | `app/Http/Controllers/AdminController.php`, `LocationController.php`, `FaceApiController.php` | Mengelola CRUD pegawai, lokasi kantor (dengan pengambilan koordinat otomatis via browser), serta perekaman embedding wajah. |
+| **Controller Pegawai** | `app/Http/Controllers/EmployeeController.php`, `AuthController.php` | Mengatur login berbasis username/NIK, halaman dashboard/camera pegawai, dan pencatatan presensi (termasuk validasi bahwa hanya ada satu presensi masuk per hari). |
+| **Model** | `app/Models/*.php` | Relasi utama: `User` ↔ `Employee` (1-1), `Employee` ↔ `Face_Embedding` (1-1), `Employee` ↔ `Presence` / `Permits` (1-n). File model masih menggunakan pewarnaan default Laravel dengan cast JSON untuk descriptor wajah. |
+| **Middleware & Provider** | `app/Http/Middleware/RoleMiddleware.php`, `app/Auth/CustomUserProvider.php`, `app/Providers/AppServiceProvider.php` | Middleware memastikan role sesuai sebelum memasuki route, sedangkan custom user provider memungkinkan login pegawai memakai field NIK. |
+| **Front-end** | `resources/views`, `resources/css`, `resources/js` | Layout admin/pegawai terpisah. Kamera memanfaatkan `face-api.js`, SweetAlert, dan model AI yang disajikan dari `public/models`. |
+
+### Catatan Implementasi Penting
+
+* Endpoint `/api/save-embedding` saat ini belum dilindungi middleware auth, sehingga perlu dipastikan akses dibatasi sebelum produksi.
+* Penamaan kolom presensi perlu diselaraskan: model & migrasi menggunakan `waktu_masuk`/`waktu_pulang`, sementara controller & view memakai `jam_masuk`. Pastikan update ketika mulai menyimpan bukti kehadiran nyata.
+* Seeder utama (`DatabaseSeeder`) sebaiknya memanggil `UserSeeder::class` agar akun admin/pegawai awal otomatis terbuat.
+
 ## Teknologi yang Digunakan
 
 <p>
@@ -34,40 +51,105 @@ Aplikasi ini memungkinkan pengguna untuk melakukan absensi dengan memindai wajah
 
 Berikut adalah langkah-langkah untuk menjalankan proyek ini di lingkungan lokal Anda.
 
-**1. Clone Repository**
-```bash
-git clone [URL_REPOSITORY_ANDA]
-cd Face-Verification-Presence
+1. **Clone Repository**
+   ```bash
+   git clone [URL_REPOSITORY_ANDA]
+   cd Face-Verification-Presence
+   ```
+
+2. **Instal Dependensi PHP & Node**
+   ```bash
+   composer install
+   npm install
+   ```
+
+3. **Konfigurasi Lingkungan**
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+   Lalu sesuaikan kredensial database, storage, dsb. di dalam `.env`.
+
+4. **Migrasi Database**
+   ```bash
+   php artisan migrate
+   ```
+   Gunakan `php artisan migrate --seed` bila ingin langsung memuat data contoh dari seeder (setelah Anda pastikan seeder sudah sesuai kebutuhan).
+
+5. **Buat Symlink Storage**
+   Perintah ini wajib dijalankan sekali di setiap mesin/server baru agar foto presensi dapat diakses melalui URL.
+   ```bash
+   php artisan storage:link
+   ```
+
+6. **Jalankan Mode Pengembangan**
+   Jalankan seluruh layanan dev (Laravel server, queue listener, dan Vite) dengan satu perintah:
+   ```bash
+   composer run dev
+   ```
+   Biarkan terminal tersebut aktif selama pengembangan. Jika Anda memilih menjalankan proses secara terpisah, gunakan `php artisan serve` dan `npm run dev` pada terminal berbeda.
+
+Aplikasi sekarang dapat diakses di `http://127.0.0.1:8000` dengan asset yang disajikan oleh Vite pada `http://localhost:5173`.
+
+## Bagan Alur & Diagram
+
+### 1. Arsitektur Umum
+
+```mermaid
+graph TD
+    subgraph Client
+        A[Halaman Login] -->|POST /login| B(AuthController)
+        C[Dashboard Admin] --> D[AdminController]
+        E[Halaman Kamera Pegawai] --> F[EmployeeController]
+        E -->|GET /api/employee/embedding| G[Face_Embedding Model]
+    end
+
+    subgraph Server Laravel
+        B -->|Validasi Role| H{RoleMiddleware}
+        H -->|Admin| D
+        H -->|Pegawai| F
+        D -->|Kelola Data| I[(employees, users, locations)]
+        F -->|Catat Presensi| J[(presences)]
+        D -->|Rekam Wajah| K(FaceApiController)
+        K -->|POST /api/save-embedding| L[(face__embeddings)]
+    end
 ```
 
-**2. Instal Dependensi**
-Pastikan Anda memiliki Composer terinstal.
-```bash
-composer install
+### 2. Alur Login (Username/NIK)
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as AuthController
+    participant CUP as CustomUserProvider
+    participant DB as DB (users/employees)
+
+    U->>A: POST /login (username, password)
+    A->>CUP: retrieveByCredentials(username)
+    CUP->>DB: Cari data pegawai (nik)
+    DB-->>CUP: User + role
+    CUP-->>A: Model User (admin/employee)
+    A->>A: Hash::check(password)
+    alt Valid
+        A->>U: Redirect ke /admin/dashboard atau /employee/dashboard
+    else Tidak valid
+        A->>U: Redirect kembali + pesan error
+    end
 ```
 
-**3. Konfigurasi Lingkungan**
-Salin file `.env.example` menjadi `.env` dan sesuaikan koneksi database Anda.
-```bash
-cp .env.example .env
-```
-Setelah itu, generate kunci aplikasi Laravel.
-```bash
-php artisan key:generate
-```
+### 3. Perekaman & Verifikasi Wajah
 
-**4. Migrasi Database**
-Jalankan migrasi untuk membuat tabel-tabel yang dibutuhkan.
-```bash
-php artisan migrate
-```
+```mermaid
+graph LR
+    AdminUI[Halaman Rekam Wajah] -->|face-api.js mendeteksi| Embed[Descriptor 128 dimensi]
+    Embed -->|POST /api/save-embedding| API(FaceApiController)
+    API -->|Validasi & Simpan| FaceTable[(face__embeddings)]
 
-**5. Jalankan Aplikasi**
-Jalankan server development Laravel.
-```bash
-php artisan serve
+    PegawaiUI[Halaman Camera] -->|GET /api/employee/embedding| FaceTable
+    PegawaiUI -->|Real-time detection| Compare{Hasil Euclidean Distance}
+    Compare -->|<= Threshold| PresenceAPI[/POST /presence/store/]
+    Compare -->|> Threshold| Error[Verifikasi ditolak]
 ```
-Aplikasi sekarang akan berjalan di `http://127.0.0.1:8000`.
 
 ## Lisensi
 

@@ -34,8 +34,8 @@
             <ul class="list-unstyled components">
                 <li><a href="{{ route('admin.index') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
                 <li><a href="{{ route('admin.data') }}"><i class="fas fa-users"></i> Data Pegawai</a></li>
-                <li><a href="{{ route('location.index') }}"><i class="fas fa-map-location-dot"></i> Lokasi Kantor</a>
-                </li>
+                <li><a href="{{ route('location.index') }}"><i class="fas fa-map-location-dot"></i> Lokasi Kantor</a></li>
+                <li><a href="{{ route('shifts.index') }}"><i class="fas fa-business-time"></i> Pengaturan Shift</a></li>
                 <li><a href="#"><i class="fas fa-history"></i> Riwayat Presensi</a></li>
             </ul>
 
