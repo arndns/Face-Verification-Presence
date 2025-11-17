@@ -19,12 +19,6 @@
 @endsection
 @section('content')
     <div class="p-4 ">
-        @if (!$locationReady)
-            <div class="alert alert-warning d-flex align-items-center gap-2">
-                <i class="fa-solid fa-triangle-exclamation"></i>
-                Lokasi kantor belum ditetapkan oleh admin. Presensi belum dapat dilakukan.
-            </div>
-        @endif
         <div class="w-100 mb-4">
             <input type="hidden" id="location" placeholder="Menunggu lokasi...">
             <!-- Wadah tidak akan melebihi lebar .w-100 -->
@@ -37,15 +31,8 @@
         <div class="w-100 mb-4">
             <button id="takeattandance"
                 class="w-100 btn btn-primary btn-lg fw-bold rounded-3 shadow d-flex align-items-center justify-content-center gap-3"
-                data-user-id="{{ $user->employee->id }}" data-location-ready="{{ $locationReady ? '1' : '0' }}"
-                @if (!$locationReady) disabled @endif> <i class="fa-solid fa-camera fa-lg"></i>
-                <span id="button-text">
-                    @if ($locationReady)
-                        Wajah Tidak Terdeteksi
-                    @else
-                        Lokasi kantor belum siap
-                    @endif
-                </span>
+                data-user-id="{{ $user->employee->id }}" disabled> <i class="fa-solid fa-camera fa-lg"></i>
+                <span id="button-text">Wajah Tidak Terdeteksi</span>
             </button>
         </div>
         {{-- <div class="w-100 mb-4">
@@ -84,7 +71,11 @@
         <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
         <script>
             // --- Variabel Global ---
-            const FACE_VERIFICATION_THRESHOLD = 0.6; // Threshold Euclidean Distance
+            const FACE_VERIFICATION_THRESHOLD = 0.45; // Threshold Euclidean Distance
+            const FACE_VERIFICATION_MARGIN = 0.05; // toleransi rata-rata
+            const VERIFICATION_SAMPLES = 3;
+            const REQUIRED_MATCHES = 2;
+            const FRAME_DELAY_MS = 150;
             let referenceDescriptor; // Diisi saat init() dari API
             let isVerifying = false; // Mencegah klik ganda
 
@@ -99,11 +90,6 @@
                     console.log("Mode absensi tidak aktif.");
                     return;
                 }
-                const locationReady = attendanceButton.dataset.locationReady === '1';
-                if (!locationReady) {
-                    console.log("Lokasi kantor belum ditetapkan, presensi dinonaktifkan.");
-                    return;
-                }
                 // Jalankan inisialisasi
                 init();
             });
@@ -112,8 +98,8 @@
                 await ensureFaceAPI(); // 1. Muat library Face-API
 
                 Swal.fire({
-                    title: 'Memuat Data',
-                    text: 'Mengunduh model & data wajah referensi Anda...',
+                    title: 'Memuat Kamera',
+                    text: 'Menyiapkan model verifikasi dan mengakses kamera Anda...',
                     allowOutsideClick: false,
                     didOpen: () => {
                         Swal.showLoading();
@@ -269,14 +255,16 @@
                     sync();
                     new ResizeObserver(sync).observe(wrap);
 
-                    // Jalankan deteksi visual (untuk UX)
-                    if (video.readyState >= 2) {
-                        runDetect(video, overlay, wrap);
-                    } else {
-                        video.addEventListener("loadedmetadata", () => runDetect(video, overlay, wrap), {
-                            once: true
-                        });
-                    }
+            // Jalankan deteksi visual (untuk UX)
+            const displayName =
+                @json(optional(optional($user)->employee)->nama ?? optional(optional($user)->employee)->nik ?? 'Tidak dikenali');
+            if (video.readyState >= 2) {
+                runDetect(video, overlay, wrap, displayName);
+            } else {
+                video.addEventListener("loadedmetadata", () => runDetect(video, overlay, wrap, displayName), {
+                    once: true
+                });
+            }
 
                     // Siapkan tombol HANYA setelah kamera live dan referensi siap
                     setupAttendanceButton('takeattandance', '.camera-capture video');
@@ -296,12 +284,16 @@
              * Menampilkan kotak deteksi dan mengaktifkan/menonaktifkan tombol.
              * Perbandingan berat (Euclidean) TIDAK dilakukan di sini.
              */
-            function runDetect(video, canvas, box) {
+            function runDetect(video, canvas, box, displayName) {
                 const ctx = canvas.getContext('2d');
                 const opts = new faceapi.MtcnnOptions({
                     minFaceSize: 100
                 }); // Opsi deteksi cepat
                 const dpr = window.devicePixelRatio || 1;
+                const overlayMirrored = (() => {
+                    const transform = window.getComputedStyle(canvas)?.transform;
+                    return transform && transform !== 'none' && transform.includes('-1');
+                })();
 
                 const attendanceButton = document.getElementById('takeattandance');
                 const buttonText = document.getElementById('button-text');
@@ -327,7 +319,42 @@
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
                         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-                        faceapi.draw.drawDetections(canvas, resizedResults);
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.font = '12px "Inter", sans-serif';
+                        resizedResults.forEach((result) => {
+                            const box = result.box;
+                            ctx.beginPath();
+                            ctx.lineWidth = 2;
+                            ctx.strokeStyle = '#38bdf8';
+                            ctx.rect(box.x, box.y, box.width, box.height);
+                            ctx.stroke();
+
+                            const label = resizedResults.length === 1 ? displayName : 'Tidak dikenali';
+                            const padding = 4;
+                            const textWidth = ctx.measureText(label).width;
+                            const textHeight = 14;
+                            const rectWidth = textWidth + padding * 2;
+                            const rectHeight = textHeight + padding;
+                            const rectX = box.x - padding;
+                            const rectY = box.y - textHeight - padding;
+                            const textY = box.y - 6;
+
+                            ctx.fillStyle = 'rgba(14, 165, 233, 0.8)';
+                            ctx.strokeStyle = '#38bdf8';
+
+                            if (overlayMirrored) {
+                                ctx.save();
+                                ctx.scale(-1, 1);
+                                ctx.fillRect(-(rectX + rectWidth), rectY, rectWidth, rectHeight);
+                                ctx.fillStyle = 'white';
+                                ctx.fillText(label, -(rectX + rectWidth) + padding, textY);
+                                ctx.restore();
+                            } else {
+                                ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
+                                ctx.fillStyle = 'white';
+                                ctx.fillText(label, rectX + padding, textY);
+                            }
+                        });
 
                         // Hanya ubah tombol jika tidak dinonaktifkan permanen (setelah sukses)
                         if (attendanceButton && buttonText) {
@@ -413,10 +440,11 @@
                     console.log('🔍 Memulai proses verifikasi...');
 
                     Swal.fire({
-                        title: 'Memverifikasi Wajah...',
-                        text: 'Harap jangan bergerak.',
+                        title: 'Mencoba melakukan presensi...',
+                        text: 'Harap tetap di posisi yang sama sementara sistem memverifikasi wajah Anda.',
                         allowOutsideClick: false,
-                        didOpen: () => Swal.showLoading()
+                        didOpen: () => Swal.showLoading(),
+                        showConfirmButton: false,
                     });
 
                     const mtcnnOptions = new faceapi.MtcnnOptions({
@@ -424,32 +452,41 @@
                     });
 
                     try {
-                        // Deteksi penuh (dengan landmark + descriptor) saat tombol diklik
-                        console.log('📸 Mendeteksi wajah dengan descriptor...');
-                        const detection = await faceapi.detectSingleFace(video, mtcnnOptions)
-                            .withFaceLandmarks()
-                            .withFaceDescriptor();
+                        const collectedDescriptors = [];
+                        let attempt = 0;
+                        console.log('📸 Mengambil beberapa sampel wajah untuk verifikasi...');
+                        while (collectedDescriptors.length < VERIFICATION_SAMPLES && attempt < VERIFICATION_SAMPLES + 2) {
+                            const detection = await faceapi.detectSingleFace(video, mtcnnOptions)
+                                .withFaceLandmarks()
+                                .withFaceDescriptor();
+                            if (detection) {
+                                collectedDescriptors.push(detection.descriptor);
+                                console.log(`✅ Sampel ${collectedDescriptors.length} berhasil diambil.`);
+                            } else {
+                                console.log('⚠️ Sampel wajah tidak terbaca, mencoba lagi...');
+                            }
+                            attempt++;
+                            await new Promise(resolve => setTimeout(resolve, FRAME_DELAY_MS));
+                        }
 
-                        if (!detection) {
-                            console.log('❌ Tidak ada wajah terdeteksi');
+                        if (!collectedDescriptors.length) {
                             Swal.fire('Verifikasi Gagal',
-                                'Wajah tidak terdeteksi. Posisikan wajah lurus ke kamera dan coba lagi.',
+                                'Wajah tidak terdeteksi dengan stabil. Posisikan wajah lurus dan coba lagi.',
                                 'error');
                             resetButton();
                             return;
                         }
 
-                        console.log('✅ Wajah terdeteksi, menghitung jarak...');
+                        const distances = collectedDescriptors.map(descriptor =>
+                            faceapi.euclideanDistance(descriptor, referenceDescriptor));
+                        const minDistance = Math.min(...distances);
+                        const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+                        const matchCount = distances.filter(d => d < FACE_VERIFICATION_THRESHOLD).length;
 
-                        // --- INTI LOGIKA VERIFIKASI (CLIENT-SIDE) ---
-                        const newDescriptor = detection.descriptor;
-                        const distance = faceapi.euclideanDistance(newDescriptor, referenceDescriptor);
-                        console.log(`📏 Jarak Euclidean: ${distance.toFixed(4)}`);
-                        console.log(`📊 Threshold: ${FACE_VERIFICATION_THRESHOLD}`);
-                        // ---------------------------------------------
+                        console.log(`📏 Sampel jarak: ${distances.map(d => d.toFixed(4)).join(', ')}`);
+                        console.log(`✅ Minimum: ${minDistance.toFixed(4)}, Rata-rata: ${avgDistance.toFixed(4)}, Cocok: ${matchCount}`);
 
-                        if (distance < FACE_VERIFICATION_THRESHOLD) {
-                            // BERHASIL: Wajah cocok
+                        if (matchCount >= REQUIRED_MATCHES && avgDistance < FACE_VERIFICATION_THRESHOLD + FACE_VERIFICATION_MARGIN) {
                             console.log('✅ Verifikasi berhasil! Wajah cocok.');
                             Swal.update({
                                 title: 'Verifikasi Berhasil!',
@@ -461,10 +498,16 @@
 
                         } else {
                             // GAGAL: Wajah tidak cocok
-                            console.log(`❌ Verifikasi gagal! Jarak terlalu besar: ${distance.toFixed(4)}`);
-                            Swal.fire('Verifikasi Gagal',
-                                `Wajah tidak cocok dengan data referensi Anda.\n\nJarak: ${distance.toFixed(2)} (Maks: ${FACE_VERIFICATION_THRESHOLD})`,
-                                'error');
+                            console.log(`❌ Verifikasi gagal! Rata-rata jarak terlalu besar: ${avgDistance.toFixed(4)}`);
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Bukan Pemilik Akun',
+                                text: 'Wajah yang terdeteksi tidak cocok dengan data pemilik akun ini.',
+                                allowOutsideClick: false,
+                                showConfirmButton: false,
+                                timer: 2200,
+                                timerProgressBar: true,
+                            });
                             resetButton();
                         }
 
@@ -500,7 +543,7 @@
             }
 
             async function sendClockInRequest(csrfToken, snapshotData) {
-                console.log('?? Memulai proses pengiriman presensi dengan foto...');
+                console.log('📸 Memulai proses pengiriman presensi dengan foto...');
 
                 if (!csrfToken) {
                     Swal.fire('Error', 'CSRF token tidak ditemukan. Refresh halaman.', 'error');
@@ -538,7 +581,10 @@
                         icon: 'success',
                         title: data.status === 'clock_out' ? 'Presensi Pulang Berhasil!' : 'Presensi Masuk Berhasil!',
                         text: `Jam tercatat: ${data.recorded_at || data.waktu_masuk || data.waktu_pulang}`,
-                        allowOutsideClick: false
+                        allowOutsideClick: false,
+                        showConfirmButton: false,
+                        timer: 2000,
+                        timerProgressBar: true,
                     });
                     const button = document.getElementById('takeattandance');
                     const buttonText = document.getElementById('button-text');
