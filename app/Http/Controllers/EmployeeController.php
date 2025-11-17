@@ -53,14 +53,9 @@ class EmployeeController extends Controller
 
     public function webcam()
     {
-        $user = User::with('employee.location')->find(Auth::id());
-        $employee = $user?->employee;
-        $locationReady = (bool) $employee?->location;
+        $user = User::find(Auth::id());
 
-        return view('Employee.camera', [
-            'user' => $user,
-            'locationReady' => $locationReady,
-        ]);
+        return view('Employee.camera', compact('user'));
     }
 
     public function faceMatcher()
@@ -89,14 +84,8 @@ class EmployeeController extends Controller
             DB::beginTransaction();
             $user = Auth::user();
             $employee = $user->employee;
-            $employee->loadMissing('location');
-
             if (!$employee) {
                 return response()->json(['error' => 'Data karyawan tidak ditemukan'], 404);
-            }
-
-            if (!$employee->location) {
-                return response()->json(['error' => 'Lokasi kantor belum ditetapkan oleh admin. Silakan hubungi administrator.'], 422);
             }
 
             $todayPresence = Presence::where('employee_id', $employee->id)
@@ -107,7 +96,7 @@ class EmployeeController extends Controller
                 return response()->json(['error' => 'Anda sudah melakukan presensi masuk hari ini'], 400);
             }
 
-            $timezone = $employee->location->timezone ?? config('app.timezone');
+            $timezone = optional($employee->location)->timezone ?? config('app.timezone');
             $now = now($timezone);
 
             $photoPath = $this->storeSnapshot($request->snapshot, $employee->id);
@@ -156,4 +145,5 @@ class EmployeeController extends Controller
 
         return $filename;
     }
+
 }
