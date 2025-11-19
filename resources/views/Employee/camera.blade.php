@@ -77,8 +77,19 @@
         const REQUIRED_MATCHES = 4;
         const FRAME_DELAY_MS = 120;
         const VIDEO_MIRRORED = true;
+        const STATUS_POLL_INTERVAL_MS = 60000;
         let referenceDescriptor; // Diisi saat init() dari API
         let isVerifying = false;
+        const presenceState = {
+            hasCheckedIn: false,
+            hasCheckedOut: false,
+            canCheckOut: false,
+            lastClockIn: null,
+            lastClockOut: null,
+        };
+        let hasShownCheckInReminder = false;
+        let hasShownCheckoutReminder = false;
+        let presenceStatusInterval = null;
 
         var lokasi = document.getElementById('location');
         if (navigator.geolocation) {
@@ -100,9 +111,16 @@
             }).addTo(map);
         }
 
-        function errorCallback() {
-
+        function errorCallback(error) {
+            console.warn('Tidak dapat membaca lokasi pengguna:', error);
+            lokasi.value = '';
+            Swal.fire({
+                icon: 'warning',
+                title: 'Akses Lokasi Diperlukan',
+                text: 'Berikan izin lokasi agar presensi dapat diverifikasi.',
+            });
         }
+
 
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -110,6 +128,15 @@
             if (!attendanceButton) {
                 console.log("Mode absensi tidak aktif.");
                 return;
+            }
+
+            monitorPresenceStatus({ showReminders: true });
+            if (!presenceStatusInterval) {
+                presenceStatusInterval = setInterval(() => {
+                    monitorPresenceStatus({
+                        showReminders: true
+                    });
+                }, STATUS_POLL_INTERVAL_MS);
             }
 
             init();
@@ -447,16 +474,27 @@
                         ctx.restore();
                     });
 
-                    if (attendanceButton && buttonText && !attendanceButton.classList.contains('btn-success')) {
-                        if (recognizedFaces === 1 && resizedResults.length === 1) {
-                            attendanceButton.disabled = false;
-                            buttonText.innerText = "Absen Sekarang";
-                        } else if (resizedResults.length > 1) {
+                    if (attendanceButton && buttonText) {
+                        const actionMode = getCurrentActionMode();
+                        if (actionMode === 'done') {
                             attendanceButton.disabled = true;
-                            buttonText.innerText = "Terlalu Banyak Wajah";
+                            buttonText.innerText = 'Presensi Hari Ini Selesai';
+                        } else if (actionMode === 'waiting') {
+                            attendanceButton.disabled = true;
+                            buttonText.innerText = 'Menunggu Jam Pulang';
+                        } else if (actionMode === 'check_out' || actionMode === 'check_in') {
+                            if (recognizedFaces === 1 && resizedResults.length === 1) {
+                                attendanceButton.disabled = false;
+                                buttonText.innerText = actionMode === 'check_out' ? 'Presensi Pulang' : 'Presensi Masuk';
+                            } else if (resizedResults.length > 1) {
+                                attendanceButton.disabled = true;
+                                buttonText.innerText = 'Terlalu Banyak Wajah';
+                            } else {
+                                attendanceButton.disabled = true;
+                                buttonText.innerText = 'Wajah Tidak Terdeteksi';
+                            }
                         } else {
                             attendanceButton.disabled = true;
-                            buttonText.innerText = "Wajah Tidak Terdeteksi";
                         }
                     }
                 } catch (detectError) {
@@ -514,17 +552,31 @@
             }
 
             console.log('✅ Setup tombol absensi berhasil untuk employee:', employeeId);
+            applyButtonIdleState();
 
             button.addEventListener('click', async () => {
+                const actionMode = getCurrentActionMode();
+                if (actionMode === 'done') {
+                    Swal.fire('Informasi', 'Anda sudah menyelesaikan presensi hari ini.', 'info');
+                    applyButtonIdleState();
+                    return;
+                }
+
+                if (actionMode === 'waiting') {
+                    Swal.fire('Belum Waktu Pulang', 'Presensi pulang dapat dilakukan setelah jam pulang shift Anda.', 'info');
+                    applyButtonIdleState();
+                    return;
+                }
+
                 if (isVerifying) {
-                    console.log('⏳ Sedang memverifikasi, abaikan klik');
+                    console.log('�?� Sedang memverifikasi, abaikan klik');
                     return;
                 }
 
                 isVerifying = true; // Kunci proses
                 button.disabled = true;
 
-                console.log('🔍 Memulai proses verifikasi...');
+                console.log('�Y"? Memulai proses verifikasi...');
 
                 Swal.fire({
                     title: 'Mencoba melakukan presensi...',
@@ -585,7 +637,7 @@
                         });
 
                         const snapshotData = takeSnapshot(video);
-                        await sendClockInRequest(csrfToken, snapshotData);
+                        await sendPresenceRequest(csrfToken, snapshotData);
 
                     } else {
                         console.log(
@@ -630,7 +682,7 @@
             return dataUrl;
         }
 
-        async function sendClockInRequest(csrfToken, snapshotData) {
+        async function sendPresenceRequest(csrfToken, snapshotData) {
             console.log('📸 Memulai proses pengiriman presensi dengan foto...');
 
             if (!csrfToken) {
@@ -664,35 +716,57 @@
                     throw new Error(errorMessage || `Server error (${response.status})`);
                 }
 
-                console.log('✅ Presensi berhasil!');
+                                console.log('✅ Presensi berhasil!');
+                const recordedTime = data.recorded_at || data.waktu_masuk || data.waktu_pulang;
+                const statusLabel = data.status_kehadiran || 'Tepat Waktu';
+                const isLate = statusLabel === 'Terlambat';
+                const shiftInfo = data.shift || {};
+                const actionType = data.action || 'clock_in';
                 Swal.fire({
-                    icon: 'success',
-                    title: data.status === 'clock_out' ? 'Presensi Pulang Berhasil!' :
-                        'Presensi Masuk Berhasil!',
-                    text: `Jam tercatat: ${data.recorded_at || data.waktu_masuk || data.waktu_pulang}`,
+                    icon: isLate ? 'warning' : 'success',
+                    title: actionType === 'clock_out' ? 'Presensi Pulang Tercatat' : (isLate ? 'Presensi Tercatat (Terlambat)' : 'Presensi Masuk Tercatat'),
+                    html: `
+                        <div class="text-start">
+                            <p><strong>Status:</strong> ${statusLabel}</p>
+                            <p><strong>Jam Shift:</strong> ${shiftInfo.jam_masuk || '-'}</p>
+                            <p><strong>Jam Presensi:</strong> ${recordedTime || '-'}</p>
+                        </div>
+                    `,
                     allowOutsideClick: false,
-                    showConfirmButton: false,
-                    timer: 2000,
-                    timerProgressBar: true,
+                    showConfirmButton: true,
+                    confirmButtonText: 'Ok'
                 });
+                if (actionType === 'clock_out') {
+                    presenceState.hasCheckedIn = true;
+                    presenceState.hasCheckedOut = true;
+                    presenceState.canCheckOut = false;
+                    presenceState.lastClockOut = recordedTime || null;
+                    hasShownCheckoutReminder = true;
+                } else {
+                    presenceState.hasCheckedIn = true;
+                    presenceState.lastClockIn = recordedTime || null;
+                    presenceState.canCheckOut = false;
+                    hasShownCheckInReminder = true;
+                }
                 const button = document.getElementById('takeattandance');
                 const buttonText = document.getElementById('button-text');
                 if (buttonText) {
-                    const timeText = data.recorded_at || data.waktu_masuk || data.waktu_pulang || '-';
+                    const timeText = recordedTime || '-';
                     buttonText.innerText = `Berhasil! (${timeText})`;
                 }
-                if (button) {
-                    button.disabled = true;
-                    button.classList.remove('btn-primary');
-                    button.classList.add('btn-success');
-                }
                 isVerifying = false;
-
+                applyButtonIdleState();
+                monitorPresenceStatus({
+                    showReminders: false
+                });
                 return data;
             } catch (err) {
                 console.error('?? Terjadi kesalahan:', err);
                 Swal.fire('Error', err.message || 'Tidak dapat terhubung ke server.', 'error');
                 resetButton();
+                monitorPresenceStatus({
+                    showReminders: false
+                });
             }
 
         }
@@ -700,13 +774,116 @@
         function resetButton() {
             console.log('🔄 Reset tombol ke status awal');
             isVerifying = false;
-            const button = document.getElementById('takeattandance');
-            const buttonText = document.getElementById('button-text');
-            if (button) button.disabled = false;
-            // Teks akan otomatis di-update oleh runDetect()
-            if (buttonText) buttonText.innerText = 'Wajah Tidak Terdeteksi';
+            applyButtonIdleState();
         }
 
+
+
+        async function monitorPresenceStatus(options = {}) {
+            const { showReminders = true } = options;
+            try {
+                const response = await fetch('/employee/presence/status', {
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    cache: 'no-cache'
+                });
+                if (!response.ok) {
+                    throw new Error('Gagal memuat status presensi');
+                }
+                const data = await response.json();
+                updatePresenceUI(data, showReminders);
+            } catch (error) {
+                console.warn('Status presensi tidak tersedia:', error);
+            }
+        }
+
+        function updatePresenceUI(data, showReminders = true) {
+            if (!data) return;
+
+            presenceState.hasCheckedIn = Boolean(data.presence && data.presence.has_checked_in);
+            presenceState.hasCheckedOut = Boolean(data.presence && data.presence.has_checked_out);
+            presenceState.canCheckOut = Boolean(data.presence && data.presence.can_check_out);
+            presenceState.lastClockIn = data.presence?.waktu_masuk || null;
+            presenceState.lastClockOut = data.presence?.waktu_pulang || null;
+
+            applyButtonIdleState();
+
+            if (showReminders) {
+                if (data.reminders?.should_check_in && !hasShownCheckInReminder) {
+                    hasShownCheckInReminder = true;
+                    showReminderModal('checkin', data.shift);
+                }
+                if (data.reminders?.should_check_out && !hasShownCheckoutReminder) {
+                    hasShownCheckoutReminder = true;
+                    showReminderModal('checkout', data.shift);
+                }
+            }
+        }
+
+        function showReminderModal(type, shiftInfo = {}) {
+            const isCheckIn = type === 'checkin';
+            const title = isCheckIn ? 'Segera Lakukan Presensi Masuk' : 'Presensi Hari Ini Belum Ditemukan';
+            const description = isCheckIn
+                ? 'Shift Anda telah dimulai. Segera lakukan presensi masuk agar tidak dianggap terlambat.'
+                : 'Jam pulang shift telah tiba namun sistem belum menemukan presensi Anda hari ini.';
+
+            Swal.fire({
+                icon: 'info',
+                title,
+                html: `<div class="text-start">
+                        <p>${description}</p>
+                        <p><strong>Shift:</strong> ${shiftInfo?.nama_shift || '-'}</p>
+                        <p><strong>Jam Masuk:</strong> ${shiftInfo?.jam_masuk || '-'}</p>
+                        <p><strong>Jam Pulang:</strong> ${shiftInfo?.jam_pulang || '-'}</p>
+                    </div>`,
+                confirmButtonText: 'Mengerti'
+            });
+        }
+
+        function getCurrentActionMode() {
+            if (presenceState.hasCheckedOut) {
+                return 'done';
+            }
+            if (!presenceState.hasCheckedIn) {
+                return 'check_in';
+            }
+            if (presenceState.canCheckOut) {
+                return 'check_out';
+            }
+            return 'waiting';
+        }
+
+        function applyButtonIdleState() {
+            const button = document.getElementById('takeattandance');
+            const buttonText = document.getElementById('button-text');
+            const actionMode = getCurrentActionMode();
+            if (!button || !buttonText) {
+                return;
+            }
+
+            button.disabled = true;
+            button.classList.remove('btn-success', 'btn-warning', 'btn-primary');
+
+            if (actionMode === 'done') {
+                button.classList.add('btn-success');
+                buttonText.innerText = `Sudah Presensi (${presenceState.lastClockOut || '-'})`;
+                return;
+            }
+
+            if (actionMode === 'waiting') {
+                button.classList.add('btn-warning');
+                buttonText.innerText = 'Menunggu Jam Pulang';
+                return;
+            }
+
+            button.classList.add('btn-primary');
+            if (actionMode === 'check_out') {
+                buttonText.innerText = 'Presensi Pulang';
+            } else {
+                buttonText.innerText = 'Wajah Tidak Terdeteksi';
+            }
+        }
 
         function forceVideoFill(video) {
             video.setAttribute("playsinline", "");

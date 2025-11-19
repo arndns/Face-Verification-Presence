@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/employee/dashboard', [EmployeeController::class, 'index'])->name('employee.index');
         Route::get('/employee/camera', [EmployeeController::class, 'webcam'])->name('employee.camera');
         Route::get('/api/employee/embedding', [EmployeeController::class, 'faceMatcher']);
+        Route::get('/employee/presence/status', [EmployeeController::class, 'presenceStatus'])->name('employee.presence.status');
         Route::post('/presence/store', [EmployeeController::class, 'presence']);
     });
 });

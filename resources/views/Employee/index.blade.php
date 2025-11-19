@@ -184,6 +184,8 @@
 @endsection
 
 @section('script')
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const checkBtn = document.getElementById('check-location');
@@ -247,5 +249,36 @@
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
             return R * c;
         }
+        @if ($presenceReminder['should_show'] ?? false)
+            (function() {
+                const shiftInfo = {
+                    nama_shift: "{{ $presenceReminder['shift_name'] ?? '-' }}",
+                    jam_masuk: "{{ $presenceReminder['shift_start'] ?? '-' }}",
+                    jam_pulang: "{{ $presenceReminder['shift_end'] ?? '-' }}",
+                    current_time: "{{ $presenceReminder['current_time'] ?? '--:--' }}",
+                    timezone: "{{ $presenceReminder['timezone'] ?? config('app.timezone') }}",
+                };
+
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Segera Lakukan Presensi Masuk',
+                    html: `<div class="text-start">
+                            <p>Shift <strong>${shiftInfo.nama_shift}</strong> sudah dimulai.</p>
+                            <p><strong>Jam Masuk:</strong> ${shiftInfo.jam_masuk}</p>
+                            <p><strong>Waktu Saat Ini:</strong> ${shiftInfo.current_time} (${shiftInfo.timezone})</p>
+                            <p class="mb-1"><strong>Jam Pulang:</strong> ${shiftInfo.jam_pulang}</p>
+                            <p class="text-muted mb-0">Segera lakukan presensi agar tidak dianggap terlambat.</p>
+                        </div>`,
+                    allowOutsideClick: false,
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="fa-solid fa-camera me-1"></i> Buka Kamera',
+                    cancelButtonText: 'Nanti',
+                }).then(result => {
+                    if (result.isConfirmed) {
+                        window.location.href = "{{ route('employee.camera') }}";
+                    }
+                });
+            })();
+        @endif
     </script>
 @endsection

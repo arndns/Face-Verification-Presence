@@ -20,6 +20,7 @@ return new class extends Migration
             $table->string('foto_masuk')->nullable();
             $table->dateTime('waktu_pulang')->nullable();
             $table->string('foto_pulang')->nullable();
+            $table->enum('status',['Terlambat', 'Tepat Waktu'])->nullable();
             $table->timestamps();
         });
     }
