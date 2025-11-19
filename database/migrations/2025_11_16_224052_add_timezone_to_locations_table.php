@@ -11,9 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('locations', function (Blueprint $table) {
-            $table->string('timezone')->default('Asia/Jakarta')->after('radius');
-        });
+        if (!Schema::hasColumn('locations', 'timezone')) {
+            Schema::table('locations', function (Blueprint $table) {
+                $table->string('timezone')->default('Asia/Jakarta')->after('radius');
+            });
+        }
     }
 
     /**
@@ -21,8 +23,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('locations', function (Blueprint $table) {
-            $table->dropColumn('timezone');
-        });
+        if (Schema::hasColumn('locations', 'timezone')) {
+            Schema::table('locations', function (Blueprint $table) {
+                $table->dropColumn('timezone');
+            });
+        }
     }
 };

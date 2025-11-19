@@ -19,13 +19,13 @@ class AdminController extends Controller
     public function index()
     {
 
-        return view('admin.index');
+        return view('Admin.index');
     }
 
     public function viewdata()
     {
         $employee = Employee::orderBy('id', 'asc')->paginate(5);
-        return view('admin.pegawai.data', compact('employee'));
+        return view('Admin.pegawai.data', compact('employee'));
     }
 
     
@@ -33,7 +33,7 @@ class AdminController extends Controller
 
     public function create()
     {
-        return view('admin.pegawai.CRUD.create');
+        return view('Admin.pegawai.CRUD.create');
     }
     public function store(Request $request)
     {
@@ -88,7 +88,7 @@ class AdminController extends Controller
     public function editdata(Employee $employee)
     {
 
-        return view('admin.pegawai.CRUD.update', [
+        return view('Admin.pegawai.CRUD.update', [
             'employee' => $employee
         ]);
     }
