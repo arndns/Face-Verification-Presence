@@ -16,19 +16,21 @@
     @vite([ 'resources/js/employee.js', 'resources/css/employee.css', 'resources/css/app.css'])
 </head>
 
-<body>
+<body class="employee-app">
 
     {{-- loader content  --}}
     <div id="loader">
         <div class="spinner-border text-primary" role="status"></div>
     </div>
 
-    @yield('header')
+    <div class="app-shell">
+        @yield('header')
 
-    <!-- Konten Halaman (Akan berubah-ubah) -->
-    <main id="main-content">
-        @yield('content')
-    </main>
+        <!-- Konten Halaman (Akan berubah-ubah) -->
+        <main id="main-content" class="app-main">
+            @yield('content')
+        </main>
+    </div>
 
     @yield('script')
 

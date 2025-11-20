@@ -34,6 +34,58 @@ Face-Verification-Presence/
 └── ...                           # Other Laravel files
 ```
 
+## 📝 Environment Configuration (.env)
+
+### 🔧 **3 Bagian Configuration:**
+
+#### **📦 BAGIAN 1: Production Configuration (AKTIF)**
+```env
+APP_ENV=production
+APP_DEBUG=false  # SECURITY FIX: Always false in production!
+APP_URL=https://azisfata.my.id
+DB_CONNECTION=sqlite
+DB_DATABASE=/home/fata/Face-Verification-Presence/database/database.sqlite
+LOG_LEVEL=error
+CACHE_STORE=file
+SESSION_DRIVER=file
+```
+
+#### **📝 BAGIAN 2: Development Configuration (DISABLED)**
+```env
+# APP_ENV=local
+# APP_DEBUG=true
+# APP_URL=http://127.0.0.1:8000
+# LOG_LEVEL=debug
+# CACHE_STORE=database
+# SESSION_DRIVER=database
+```
+
+#### **🗄️ BAGIAN 3: Database Switching Options**
+```env
+# Production MySQL (masa depan)
+# DB_CONNECTION=mysql
+# DB_DATABASE=face_verification_prod
+
+# Development MySQL
+# DB_CONNECTION=mysql
+# DB_DATABASE=face_verification_dev
+```
+
+### 🔄 **Cara Switch Environment:**
+
+**Production (Current):**
+- Bagian 1 aktif, Bagian 2 disabled
+- SQLite production sudah aktif
+
+**Development:**
+1. Comment Bagian 1 (tambah #)
+2. Uncomment Bagian 2 (hapus #)
+3. Pilih database option di Bagian 3
+
+**MySQL Migration:**
+1. Comment SQLite configuration
+2. Uncomment MySQL option yang diinginkan
+
 ## 🆕 Setup Server Baru
 
 Script `deploy.sh` sekarang memiliki **auto-install requirements** dan **dynamic path configuration** yang akan memeriksa dan menginstall:
@@ -80,8 +132,13 @@ cd Face-Verification-Presence
 
 **2. Setup environment:**
 ```bash
-cp .env.example .env
-nano .env  # edit database dan config lainnya
+# .env sudah dikonfigurasi dengan 3 bagian:
+# - BAGIAN 1: Production Configuration (AKTIF)
+# - BAGIAN 2: Development Configuration (DISABLED)
+# - BAGIAN 3: Database Switching Options
+
+# Edit jika perlu customization:
+nano .env
 ```
 
 **3. Run deployment (auto-install semua requirements):**
