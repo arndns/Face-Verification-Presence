@@ -424,4 +424,61 @@ class EmployeeController extends Controller
         return $earthRadius * $c;
     }
 
+    public function history_presence(Request $request){
+        $user = Auth::user();
+        $employee = $user?->employee;
+
+        if (!$employee) {
+            return redirect()->route('employee.index')->with('error', 'Data karyawan tidak ditemukan.');
+        }
+
+        $fromDate = $request->query('from');
+        $toDate = $request->query('to');
+
+        $query = Presence::where('employee_id', $employee->id);
+
+        if ($fromDate) {
+            $query->where(function ($q) use ($fromDate) {
+                $q->whereDate('waktu_masuk', '>=', $fromDate)
+                    ->orWhereDate('waktu_pulang', '>=', $fromDate);
+            });
+        }
+
+        if ($toDate) {
+            $query->where(function ($q) use ($toDate) {
+                $q->whereDate('waktu_masuk', '<=', $toDate)
+                    ->orWhereDate('waktu_pulang', '<=', $toDate);
+            });
+        }
+
+        $rawHistories = $query
+            ->orderByDesc('waktu_masuk')
+            ->orderByDesc('waktu_pulang')
+            ->limit(50)
+            ->get();
+
+        $histories = $rawHistories->map(function ($presence) {
+            $date = $presence->waktu_masuk ?? $presence->waktu_pulang;
+            $dateIso = $date ? $date->format('Y-m-d') : null;
+
+            return [
+                'date_iso' => $dateIso,
+                'formatted_date' => $date ? $date->translatedFormat('l, d M Y') : '-',
+                'masuk' => $presence->waktu_masuk ? $presence->waktu_masuk->format('H:i') : '-',
+                'pulang' => $presence->waktu_pulang ? $presence->waktu_pulang->format('H:i') : '-',
+                'status_label' => $presence->status ?? ($presence->waktu_pulang ? 'Selesai' : 'Berjalan'),
+                'status_badge' => $presence->waktu_pulang ? 'success' : 'warning',
+            ];
+        });
+
+        return view('Employee.history_presence', [
+            'employee' => $employee,
+            'histories' => $histories,
+            'filters' => [
+                'from' => $fromDate,
+                'to' => $toDate,
+            ],
+        ]);
+    }
+
 }

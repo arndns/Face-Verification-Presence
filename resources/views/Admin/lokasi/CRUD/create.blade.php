@@ -87,6 +87,11 @@
             </div>
         </div>
     </div>
+
+
+@endsection
+@section('script')
+
     <script>
         const latitudeInput = document.getElementById('latitude');
         const longitudeInput = document.getElementById('longitude');
@@ -133,5 +138,4 @@
             locationStatus.classList.remove('text-success');
         }
     </script>
-
 @endsection

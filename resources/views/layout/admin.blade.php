@@ -53,28 +53,25 @@
             </ul>
         </nav>
 
-        <!-- Konten Utama (termasuk Navbar) -->
-        <div id="content">
-            <!-- Navbar yang kini berfungsi sebagai pembatas -->
-            <nav class="navbar navbar-expand-lg main-navbar fixed-top">
-                <div class="container-fluid p-0">
-                    <button type="button" id="sidebarCollapse" class="btn btn-light rounded-circle p-2">
+        <!-- Konten Utama -->
+        <div class="content-wrapper">
+            <div id="admin-toggle-bar">
+                <div class="d-flex align-items-center gap-3">
+                    <button type="button" id="sidebarCollapse" class="navbar-toggle-btn">
                         <img src="{{ asset('assets/image/nuansa-laras-icon.ico') }}" alt="Menu"
-                            style="width: 28px; height: 28px; border-radius: 4px;">
+                            style="width: 40px; height: 40px; border-radius: 8px;">
                     </button>
                 </div>
-            </nav>
+            </div>
+            <div id="content">
+                <!-- Area Konten Halaman Anda -->
+                <main class="main-content-area">
+                    @yield('content')
+                </main>
+                @yield('script')
 
-
-
-            <!-- Area Konten Halaman Anda -->
-            <main class="main-content-area">
-                @yield('content')
-            </main>
-            @yield('script')
-
-
-            @yield('style')
+                @yield('style')
+            </div>
         </div>
         <div class="sidebar-backdrop"></div>
     </div>

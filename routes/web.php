@@ -47,6 +47,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/api/employee/embedding', [EmployeeController::class, 'faceMatcher']);
         Route::get('/employee/presence/status', [EmployeeController::class, 'presenceStatus'])->name('employee.presence.status');
         Route::post('/presence/store', [EmployeeController::class, 'presence']);
+        Route::get('employee/history/presence', [EmployeeController::class, 'history_presence'])->name('employee.presence.history');
     });
 });
 

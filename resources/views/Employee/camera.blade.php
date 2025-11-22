@@ -21,7 +21,7 @@
     @php
         $employeeLocationInfo = $employeeLocation ?? optional(optional($user)->employee)->location;
     @endphp
-    <div class="p-4 ">
+    <div class="p-4 camera-page">
         <div class="w-100 mb-4" data-camera-wrapper>
             <input type="hidden" id="location" placeholder="Menunggu lokasi..." readonly>
             <!-- Wadah tidak akan melebihi lebar .w-100 -->
@@ -38,13 +38,6 @@
                 <span id="button-text">Wajah Tidak Terdeteksi</span>
             </button>
         </div>
-        {{-- <div class="w-100 mb-4">
-            <button id="takeattandance"
-                class="w-100 btn btn-danger btn-lg fw-bold rounded-3 shadow d-flex align-items-center justify-content-center gap-3">
-                <i class="fa-solid fa-camera fa-lg"></i>
-                <span id="button-text">Presensi Pulang</span>
-            </button>
-        </div> --}}
         <div class="w-100 mb-4">
             <div id="locationAlertWrapper"
                 class="alert alert-secondary small mb-3 d-flex align-items-start justify-content-between gap-2" role="alert">
@@ -76,14 +69,18 @@
 
         #map {
             height: 200px;
+            margin-bottom: 120px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .camera-page {
+            padding-bottom: 140px;
         }
     </style>
 
 
-
 @endsection
-
-
 @section('script')
     @php
         $employeeLocationPayload = $employeeLocationInfo
@@ -97,7 +94,6 @@
             ]
             : null;
     @endphp
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     <script>
         // --- Variabel Global ---
         const EMPLOYEE_LOCATION = @json($employeeLocationPayload);
@@ -153,8 +149,18 @@
         let locationAlertLastMessage = null;
 
         function initializeGeolocation() {
+            const isSecure = window.isSecureContext || ['localhost', '127.0.0.1'].includes(location.hostname);
+            if (!isSecure) {
+                const insecureMessage =
+                    'Browser memblokir geolokasi karena halaman tidak diakses via HTTPS/localhost. Buka lewat https atau localhost agar izin lokasi muncul.';
+                updateLocationAlert(insecureMessage, 'warning');
+                renderFallbackOfficeMap();
+                return;
+            }
+
             if (!navigator.geolocation) {
                 updateLocationAlert('Perangkat Anda tidak mendukung geolocation.', 'danger');
+                renderFallbackOfficeMap();
                 return;
             }
 
@@ -214,6 +220,7 @@
             updateLocationAlert(message, 'danger');
             showLocationRequirementModal(message);
             applyButtonIdleState();
+            renderFallbackOfficeMap();
         }
 
  
@@ -229,6 +236,7 @@
                 updateLocationAlert();
             }
 
+            renderFallbackOfficeMap();
             initializeGeolocation();
 
             const attendanceButton = document.getElementById('takeattandance');
@@ -248,6 +256,44 @@
 
             init();
         });
+
+        function renderFallbackOfficeMap() {
+            const hasOfficeLocation = Boolean(
+                EMPLOYEE_LOCATION && EMPLOYEE_LOCATION.latitude !== null && EMPLOYEE_LOCATION.longitude !== null
+            );
+            const fallbackLat = hasOfficeLocation ? Number(EMPLOYEE_LOCATION.latitude) : 0;
+            const fallbackLng = hasOfficeLocation ? Number(EMPLOYEE_LOCATION.longitude) : 0;
+
+            ensureMapInstance(fallbackLat, fallbackLng);
+
+            if (!mapInstance || !hasOfficeLocation) {
+                return;
+            }
+
+            const officeLatLng = [fallbackLat, fallbackLng];
+            if (!mapLayers.officeMarker) {
+                mapLayers.officeMarker = L.marker(officeLatLng, {
+                    title: `Lokasi Kantor (${EMPLOYEE_LOCATION.kota || '-'})`
+                }).addTo(mapInstance);
+            } else {
+                mapLayers.officeMarker.setLatLng(officeLatLng);
+            }
+
+            if (!mapLayers.allowedCircle) {
+                mapLayers.allowedCircle = L.circle(officeLatLng, {
+                    color: '#2563eb',
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.08,
+                    radius: Number(EMPLOYEE_LOCATION.radius || 0),
+                    dashArray: '4 8'
+                }).addTo(mapInstance);
+            } else {
+                mapLayers.allowedCircle.setLatLng(officeLatLng);
+                mapLayers.allowedCircle.setRadius(Number(EMPLOYEE_LOCATION.radius || 0));
+            }
+
+            mapInstance.setView(officeLatLng, 15);
+        }
 
         function ensureMapInstance(lat, lng) {
             if (mapInstance) {
@@ -389,16 +435,8 @@
                 return;
             }
 
-            const distanceText = locationValidation.distanceMeters !== null
-                ? `${locationValidation.distanceMeters.toFixed(1)} m`
-                : '-';
-            if (locationValidation.isInsideRadius) {
-                setAlertState(locationAlertElement, 'success',
-                    `Anda berada dalam radius lokasi (${distanceText}). Radius diizinkan ${EMPLOYEE_LOCATION.radius || 0} m.`);
-            } else {
-                setAlertState(locationAlertElement, 'danger',
-                    `Anda di luar radius lokasi (${distanceText}). Radius diizinkan ${EMPLOYEE_LOCATION.radius || 0} m.`);
-            }
+            // Notifikasi radius hanya melalui modal; sembunyikan alert jika lokasi sudah terbaca.
+            hideLocationAlert();
         }
 
         function setAlertState(element, type, message) {
@@ -419,6 +457,15 @@
             element.classList.remove('d-none');
             locationAlertDismissed = false;
             locationAlertTextElement.innerHTML = finalMessage;
+        }
+
+        function hideLocationAlert() {
+            if (!locationAlertElement) {
+                return;
+            }
+            locationAlertElement.classList.add('d-none');
+            locationAlertLastType = null;
+            locationAlertLastMessage = null;
         }
 
         function dismissLocationAlert() {
@@ -1364,8 +1411,3 @@
 
 
 @endsection
-
-
-
-
-

@@ -1,6 +1,5 @@
 @extends('layout.employee')
 @section('title', 'Dashboard')
-
 @php
     use Carbon\Carbon;
     $employeeProfile = $employee;
@@ -21,7 +20,6 @@
         $currentWeekKey = $weekKeys->last();
     }
 @endphp
-
 @section('content')
     <div class="page active" id="home-page">
         <div class="user-section">
@@ -194,7 +192,7 @@
 @endsection
 
 @section('script')
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    
     
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -326,5 +324,6 @@
                 });
             })();
         @endif
+
     </script>
 @endsection

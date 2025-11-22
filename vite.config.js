@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
 
     return {
         server: {
-            host: '0.0.0.0',
+            host: devServerHost,
             port: devServerPort,
             strictPort: true,
             hmr: {

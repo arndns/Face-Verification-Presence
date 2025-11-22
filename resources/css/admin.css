@@ -9,9 +9,9 @@
     --bg-white: #ffffff;
     --text-dark: #212529;
     --text-light: #f8f9fa;
-    --sidebar-width: 280px; /* Lebar sidebar, bisa diubah */
+    --sidebar-width: 360px; /* Sidebar lebih lebar */
     --border-color: #dee2e6; /* Warna border Bootstrap */
-    --header-height: 73px; /* Menetapkan tinggi standar untuk header */
+    --header-height: 72px; /* Tinggi bar toggle diperlebar */
 }
 
 body {
@@ -19,11 +19,12 @@ body {
     background-color: var(--bg-light);
     color: var(--text-dark);
     overflow-x: hidden;
+    margin: 0; /* hilangkan gutter default agar garis header sejajar */
 }
 
 @media (min-width: 992px) { 
   body {
-    padding-top: 50px;
+    padding-top: 0;
   }
 }
 
@@ -60,10 +61,10 @@ body {
 .sidebar-header {
     background: transparent;
     border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-    min-height: var(--header-height);
+    height: var(--header-height);
     display: flex;
     align-items: center;
-    padding: 0 20px;
+    padding: 0 16px;
 }
 
 #sidebar .components {
@@ -104,7 +105,7 @@ a[aria-expanded="true"] {
 }
 
 /* --- Gaya Konten Utama (termasuk Navbar) --- */
-#content {
+.content-wrapper {
     width: 100%;
     min-height: 100vh;
     transition: all 0.3s ease-in-out;
@@ -112,40 +113,51 @@ a[aria-expanded="true"] {
     background-color: var(--bg-light);
 }
 
-#sidebar.collapsed + #content {
+.content-wrapper #content {
+    min-height: calc(100vh - var(--header-height));
+}
+
+#sidebar.collapsed + .content-wrapper {
     padding-left: 0;
 }
 
 /* --- Gaya Navbar (Sebagai Pembatas) --- */
-.main-navbar {
+.navbar-toggle-btn {
+    border: none;
+    background: transparent;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
+}
+.navbar-toggle-btn:hover,
+.navbar-toggle-btn:focus {
+    background: transparent;
+    box-shadow: none;
+    outline: none;
+}
+
+/* Bar toggle agar menempel ke atas */
+#admin-toggle-bar {
     position: sticky;
     top: 0;
+    left: 0;
     z-index: 1020;
-    background-color: var(--bg-light) !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    border-bottom: 1px solid var(--border-color);
+    background-color: var(--bg-white);
+    height: var(--header-height);
     min-height: var(--header-height);
+    width: 100%;
+    border-radius: 0;
+    padding: 0 24px;
     display: flex;
     align-items: center;
-    padding: 0 1.5rem !important;
-}
-
-#sidebarCollapse {
+    justify-content: flex-start;
     border: none;
-    background-color: #f1f1f1;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease-in-out;
-}
-#sidebarCollapse:hover {
-    background-color: #e9ecef;
-}
-
-#sidebar.collapsed + #content .main-navbar #sidebarCollapse {
-    opacity: 1;
-    pointer-events: auto;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: none;
 }
 
 /* --- Area Konten di bawah Navbar --- */
@@ -245,5 +257,3 @@ a[aria-expanded="true"] {
 .form-label {
     font-weight: 500;
 }
-
-

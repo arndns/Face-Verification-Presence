@@ -13,6 +13,7 @@
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     @vite([ 'resources/js/employee.js', 'resources/css/employee.css', 'resources/css/app.css'])
 </head>
 
@@ -54,9 +55,9 @@
             <i class="fa-solid fa-camera"></i>
             <strong>Camera</strong>
         </a>
-        <a href="#" class="item">
-            <i class="fa-solid fa-file-alt"></i>
-            <strong>Docs</strong>
+        <a href="{{route('employee.presence.history')}}" class="item">
+            <i class="fa-solid fa-history"></i>
+            <strong>History</strong>
         </a>
         <a href="#" class="item">
             <i class="fa-solid fa-users"></i>
