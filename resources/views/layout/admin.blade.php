@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="{{ asset('assets/fontawesome/css/all.min.css') }}">
     <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ asset('assets/js/bootstrap.bundle.min.js') }}"></script>
-    @vite(['resources/css/admin.css', 'resource/js/app.js', 'resources/sass/app.scss', 'resources/js/admin.js'])
+    @vite(['resources/css/app.css', 'resources/css/admin.css', 'resources/js/app.js', 'resources/js/admin.js'])
 
     <title>@yield('title', 'Dashboard')</title>
 </head>
