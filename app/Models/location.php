@@ -10,7 +10,7 @@ class Location extends Model
 {
     use HasFactory;
     protected $guarded = ['id'];
-    protected $fillable = ['kota', 'alamat', 'latitude', 'longitude', 'radius', 'timezone'];
+    protected $fillable = ['kota', 'alamat', 'latitude', 'longitude', 'radius'];
 
     public function employees(): HasMany
     {

@@ -18,6 +18,9 @@
     </div>
 @endsection
 @section('content')
+    @php
+        $employeeLocationInfo = $employeeLocation ?? optional(optional($user)->employee)->location;
+    @endphp
     <div class="p-4 ">
         <div class="w-100 mb-4" data-camera-wrapper>
             <input type="hidden" id="location" placeholder="Menunggu lokasi..." readonly>
@@ -43,6 +46,20 @@
             </button>
         </div> --}}
         <div class="w-100 mb-4">
+            <div id="locationAlertWrapper"
+                class="alert alert-secondary small mb-3 d-flex align-items-start justify-content-between gap-2" role="alert">
+                <div id="locationValidationStatusText">
+                    @if ($employeeLocationInfo)
+                        Menunggu pembacaan lokasi perangkat...
+                    @else
+                        Lokasi presensi belum ditetapkan. Hubungi admin untuk bantuan.
+                    @endif
+                </div>
+                <button type="button" class="btn btn-sm btn-light text-muted px-2 py-0"
+                    aria-label="Tutup notifikasi" onclick="dismissLocationAlert()">
+                    &times;
+                </button>
+            </div>
             <div id="map"></div>
         </div>
     </div>
@@ -68,9 +85,27 @@
 
 
 @section('script')
+    @php
+        $employeeLocationPayload = $employeeLocationInfo
+            ? [
+                'id' => $employeeLocationInfo->id,
+                'kota' => $employeeLocationInfo->kota,
+                'alamat' => $employeeLocationInfo->alamat,
+                'latitude' => $employeeLocationInfo->latitude !== null ? (float) $employeeLocationInfo->latitude : null,
+                'longitude' => $employeeLocationInfo->longitude !== null ? (float) $employeeLocationInfo->longitude : null,
+                'radius' => $employeeLocationInfo->radius !== null ? (float) $employeeLocationInfo->radius : null,
+            ]
+            : null;
+    @endphp
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
     <script>
         // --- Variabel Global ---
+        const EMPLOYEE_LOCATION = @json($employeeLocationPayload);
+        const GEOLOCATION_OPTIONS = {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 20000
+        };
         const FACE_VERIFICATION_THRESHOLD = 0.38; // Threshold Euclidean Distance
         const FACE_VERIFICATION_MARGIN = 0.03; // toleransi rata-rata
         const VERIFICATION_SAMPLES = 5;
@@ -90,40 +125,112 @@
         let hasShownCheckInReminder = false;
         let hasShownCheckoutReminder = false;
         let presenceStatusInterval = null;
+        let lokasiInput = null;
+        let locationAlertElement = null;
+        let locationAlertTextElement = null;
+        const geoState = {
+            latitude: null,
+            longitude: null,
+            accuracy: null,
+        };
+        const locationValidation = {
+            ready: false,
+            isInsideRadius: false,
+            distanceMeters: null,
+        };
+        let mapInstance = null;
+        const mapLayers = {
+            userMarker: null,
+            userCircle: null,
+            officeMarker: null,
+            allowedCircle: null,
+        };
+        let locationNotConfiguredModalShown = false;
+        let outsideRadiusModalShown = false;
+        let missingLocationModalShown = false;
+        let locationAlertDismissed = false;
+        let locationAlertLastType = null;
+        let locationAlertLastMessage = null;
 
-        var lokasi = document.getElementById('location');
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
+        function initializeGeolocation() {
+            if (!navigator.geolocation) {
+                updateLocationAlert('Perangkat Anda tidak mendukung geolocation.', 'danger');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(successCallback, errorCallback, GEOLOCATION_OPTIONS);
+            navigator.geolocation.watchPosition(successCallback, errorCallback, GEOLOCATION_OPTIONS);
         }
 
         function successCallback(position) {
-            lokasi.value = position.coords.latitude + ',' + position.coords.longitude;
-            var map = L.map('map').setView([position.coords.latitude, position.coords.longitude], 15);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
-            var maker = L.marker([position.coords.latitude, position.coords.longitude]).addTo(map);
-            var circle = L.circle([position.coords.latitude, position.coords.longitude], {
-                color: 'red',
-                fillColor: '#f03',
-                fillOpacity: 0.5,
-                radius: 20
-            }).addTo(map);
+            geoState.latitude = position.coords.latitude;
+            geoState.longitude = position.coords.longitude;
+            geoState.accuracy = position.coords.accuracy ?? null;
+
+            if (lokasiInput) {
+                lokasiInput.value = `${geoState.latitude},${geoState.longitude}`;
+            }
+
+            missingLocationModalShown = false;
+
+            const mapCenterLat = EMPLOYEE_LOCATION?.latitude ?? geoState.latitude;
+            const mapCenterLng = EMPLOYEE_LOCATION?.longitude ?? geoState.longitude;
+            ensureMapInstance(mapCenterLat, mapCenterLng);
+            updateMapLayers(geoState.latitude, geoState.longitude);
+            validateEmployeeLocation();
+            updateLocationAlert();
         }
 
         function errorCallback(error) {
             console.warn('Tidak dapat membaca lokasi pengguna:', error);
-            lokasi.value = '';
-            Swal.fire({
-                icon: 'warning',
-                title: 'Akses Lokasi Diperlukan',
-                text: 'Berikan izin lokasi agar presensi dapat diverifikasi.',
-            });
+            geoState.latitude = null;
+            geoState.longitude = null;
+            geoState.accuracy = null;
+
+            if (lokasiInput) {
+                lokasiInput.value = '';
+            }
+
+            locationValidation.ready = false;
+            locationValidation.isInsideRadius = false;
+            locationValidation.distanceMeters = null;
+
+            let message = 'Berikan izin lokasi agar presensi dapat diverifikasi.';
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "Perizinan lokasi ditolak. Izin diperlukan untuk presensi.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "Informasi lokasi tidak tersedia.";
+                    break;
+                case error.TIMEOUT:
+                    message = "Permintaan lokasi melebihi batas waktu.";
+                    break;
+                default:
+                    message = "Terjadi kesalahan saat membaca lokasi perangkat.";
+                    break;
+            }
+
+            updateLocationAlert(message, 'danger');
+            showLocationRequirementModal(message);
+            applyButtonIdleState();
         }
 
-
+ 
 
         document.addEventListener("DOMContentLoaded", () => {
+            lokasiInput = document.getElementById('location');
+            locationAlertElement = document.getElementById('locationAlertWrapper');
+            locationAlertTextElement = document.getElementById('locationValidationStatusText');
+
+            if (!EMPLOYEE_LOCATION) {
+                ensureLocationConfigured();
+            } else {
+                updateLocationAlert();
+            }
+
+            initializeGeolocation();
+
             const attendanceButton = document.getElementById('takeattandance');
             if (!attendanceButton) {
                 console.log("Mode absensi tidak aktif.");
@@ -141,6 +248,246 @@
 
             init();
         });
+
+        function ensureMapInstance(lat, lng) {
+            if (mapInstance) {
+                return mapInstance;
+            }
+
+            mapInstance = L.map('map').setView([lat, lng], 15);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(mapInstance);
+
+            return mapInstance;
+        }
+
+        function updateMapLayers(userLat, userLng) {
+            if (!mapInstance) {
+                return;
+            }
+
+            const userLatLng = [userLat, userLng];
+            if (!mapLayers.userMarker) {
+                mapLayers.userMarker = L.marker(userLatLng, {
+                    title: 'Lokasi Anda'
+                }).addTo(mapInstance);
+            } else {
+                mapLayers.userMarker.setLatLng(userLatLng);
+            }
+
+            const accuracyRadius = Math.max(geoState.accuracy || 20, 20);
+            if (!mapLayers.userCircle) {
+                mapLayers.userCircle = L.circle(userLatLng, {
+                    color: '#16a34a',
+                    fillColor: '#16a34a',
+                    fillOpacity: 0.2,
+                    radius: accuracyRadius
+                }).addTo(mapInstance);
+            } else {
+                mapLayers.userCircle.setLatLng(userLatLng);
+                mapLayers.userCircle.setRadius(accuracyRadius);
+            }
+
+            if (EMPLOYEE_LOCATION && EMPLOYEE_LOCATION.latitude !== null && EMPLOYEE_LOCATION.longitude !== null) {
+                const officeLatLng = [Number(EMPLOYEE_LOCATION.latitude), Number(EMPLOYEE_LOCATION.longitude)];
+                if (!mapLayers.officeMarker) {
+                    mapLayers.officeMarker = L.marker(officeLatLng, {
+                        title: `Lokasi Kantor (${EMPLOYEE_LOCATION.kota || '-'})`
+                    }).addTo(mapInstance);
+                } else {
+                    mapLayers.officeMarker.setLatLng(officeLatLng);
+                }
+
+                if (!mapLayers.allowedCircle) {
+                    mapLayers.allowedCircle = L.circle(officeLatLng, {
+                        color: '#2563eb',
+                        fillColor: '#3b82f6',
+                        fillOpacity: 0.08,
+                        radius: Number(EMPLOYEE_LOCATION.radius || 0),
+                        dashArray: '4 8'
+                    }).addTo(mapInstance);
+                } else {
+                    mapLayers.allowedCircle.setLatLng(officeLatLng);
+                    mapLayers.allowedCircle.setRadius(Number(EMPLOYEE_LOCATION.radius || 0));
+                }
+
+                const bounds = L.latLngBounds(userLatLng, officeLatLng);
+                mapInstance.fitBounds(bounds.pad(0.4));
+            } else {
+                mapInstance.setView(userLatLng, mapInstance.getZoom());
+            }
+        }
+
+        function validateEmployeeLocation() {
+            if (!EMPLOYEE_LOCATION) {
+                locationValidation.ready = false;
+                locationValidation.isInsideRadius = false;
+                locationValidation.distanceMeters = null;
+                ensureLocationConfigured();
+                applyButtonIdleState();
+                return;
+            }
+
+            if (EMPLOYEE_LOCATION.latitude === null || EMPLOYEE_LOCATION.longitude === null) {
+                locationValidation.ready = false;
+                locationValidation.isInsideRadius = false;
+                locationValidation.distanceMeters = null;
+                ensureLocationConfigured();
+                applyButtonIdleState();
+                return;
+            }
+
+            if (geoState.latitude === null || geoState.longitude === null) {
+                locationValidation.ready = false;
+                locationValidation.isInsideRadius = false;
+                locationValidation.distanceMeters = null;
+                applyButtonIdleState();
+                return;
+            }
+
+            const distance = calculateDistanceMeters(
+                geoState.latitude,
+                geoState.longitude,
+                Number(EMPLOYEE_LOCATION.latitude),
+                Number(EMPLOYEE_LOCATION.longitude)
+            );
+
+            locationValidation.ready = true;
+            locationValidation.distanceMeters = distance;
+            const radiusLimit = Number(EMPLOYEE_LOCATION.radius || 0);
+            locationValidation.isInsideRadius = radiusLimit <= 0 || distance <= radiusLimit;
+
+            if (!locationValidation.isInsideRadius) {
+                promptOutsideRadiusModal(distance, radiusLimit);
+            } else {
+                outsideRadiusModalShown = false;
+            }
+
+            applyButtonIdleState();
+        }
+
+        function updateLocationAlert(message = null, status = 'info') {
+            if (!locationAlertElement) {
+                return;
+            }
+
+            if (!EMPLOYEE_LOCATION) {
+                setAlertState(locationAlertElement, 'warning',
+                    'Lokasi presensi belum ditetapkan. Hubungi admin untuk bantuan.');
+                return;
+            }
+
+            if (message) {
+                setAlertState(locationAlertElement, status, message);
+                return;
+            }
+
+            if (!locationValidation.ready) {
+                setAlertState(locationAlertElement, 'info',
+                    `Radius lokasi: ${EMPLOYEE_LOCATION.radius || 0} m. Menunggu lokasi perangkat...`);
+                return;
+            }
+
+            const distanceText = locationValidation.distanceMeters !== null
+                ? `${locationValidation.distanceMeters.toFixed(1)} m`
+                : '-';
+            if (locationValidation.isInsideRadius) {
+                setAlertState(locationAlertElement, 'success',
+                    `Anda berada dalam radius lokasi (${distanceText}). Radius diizinkan ${EMPLOYEE_LOCATION.radius || 0} m.`);
+            } else {
+                setAlertState(locationAlertElement, 'danger',
+                    `Anda di luar radius lokasi (${distanceText}). Radius diizinkan ${EMPLOYEE_LOCATION.radius || 0} m.`);
+            }
+        }
+
+        function setAlertState(element, type, message) {
+            if (!element || !locationAlertTextElement) {
+                return;
+            }
+
+            const finalMessage = typeof message === 'string' ? message : String(message ?? '');
+            if (locationAlertDismissed && locationAlertLastType === type && locationAlertLastMessage === finalMessage) {
+                return;
+            }
+
+            locationAlertLastType = type;
+            locationAlertLastMessage = finalMessage;
+
+            const baseClass = 'small mb-3 d-flex align-items-start justify-content-between gap-2';
+            element.className = `alert alert-${type} ${baseClass}`;
+            element.classList.remove('d-none');
+            locationAlertDismissed = false;
+            locationAlertTextElement.innerHTML = finalMessage;
+        }
+
+        function dismissLocationAlert() {
+            if (!locationAlertElement) {
+                return;
+            }
+            locationAlertDismissed = true;
+            locationAlertElement.classList.add('d-none');
+        }
+
+        function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
+            const R = 6371000;
+            const φ1 = lat1 * Math.PI / 180;
+            const φ2 = lat2 * Math.PI / 180;
+            const Δφ = (lat2 - lat1) * Math.PI / 180;
+            const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+            return R * c;
+        }
+
+        function promptOutsideRadiusModal(distance, radius) {
+            if (outsideRadiusModalShown) {
+                return;
+            }
+            outsideRadiusModalShown = true;
+            Swal.fire({
+                icon: 'warning',
+                title: 'Di luar radius lokasi',
+                html: `<div class="text-start">
+                        <p>Anda berada ${distance.toFixed(1)} meter dari titik kantor.</p>
+                        <p>Radius maksimum yang diizinkan adalah ${radius} meter.</p>
+                    </div>`,
+                confirmButtonText: 'Mengerti'
+            });
+        }
+
+        function showLocationRequirementModal(message) {
+            if (missingLocationModalShown) {
+                return;
+            }
+            missingLocationModalShown = true;
+            Swal.fire({
+                icon: 'warning',
+                title: 'Akses Lokasi Diperlukan',
+                text: message,
+                confirmButtonText: 'Mengerti'
+            }).then(() => {
+                missingLocationModalShown = false;
+            });
+        }
+
+        function ensureLocationConfigured() {
+            if (locationNotConfiguredModalShown || EMPLOYEE_LOCATION) {
+                return;
+            }
+
+            locationNotConfiguredModalShown = true;
+            Swal.fire({
+                icon: 'info',
+                title: 'Lokasi Presensi Belum Tersedia',
+                text: 'Admin belum menetapkan lokasi presensi untuk akun Anda. Presensi tidak dapat dilanjutkan.',
+                confirmButtonText: 'Mengerti'
+            });
+        }
 
         async function init() {
             await ensureFaceAPI(); // 1. Muat library Face-API
@@ -568,6 +915,30 @@
                     return;
                 }
 
+                if (!EMPLOYEE_LOCATION) {
+                    ensureLocationConfigured();
+                    resetButton();
+                    return;
+                }
+
+                if (!locationValidation.ready) {
+                    Swal.fire('Menunggu Lokasi', 'Sistem masih membaca lokasi perangkat Anda.', 'info');
+                    resetButton();
+                    return;
+                }
+
+                if (!locationValidation.isInsideRadius) {
+                    promptOutsideRadiusModal(locationValidation.distanceMeters || 0, Number(EMPLOYEE_LOCATION.radius || 0));
+                    resetButton();
+                    return;
+                }
+
+                if (geoState.latitude === null || geoState.longitude === null) {
+                    Swal.fire('Lokasi Tidak Tersedia', 'Koordinat perangkat belum tersedia.', 'info');
+                    resetButton();
+                    return;
+                }
+
                 if (isVerifying) {
                     console.log('�?� Sedang memverifikasi, abaikan klik');
                     return;
@@ -684,6 +1055,23 @@
 
         async function sendPresenceRequest(csrfToken, snapshotData) {
             console.log('📸 Memulai proses pengiriman presensi dengan foto...');
+            if (!EMPLOYEE_LOCATION) {
+                Swal.fire('Lokasi Tidak Tersedia', 'Lokasi presensi belum ditetapkan. Hubungi admin.', 'error');
+                resetButton();
+                return;
+            }
+
+            if (!locationValidation.ready || !locationValidation.isInsideRadius) {
+                Swal.fire('Di Luar Radius', 'Anda berada di luar radius lokasi atau lokasi belum terbaca.', 'error');
+                resetButton();
+                return;
+            }
+
+            if (geoState.latitude === null || geoState.longitude === null) {
+                Swal.fire('Lokasi Tidak Terbaca', 'Aktifkan GPS untuk melanjutkan.', 'error');
+                resetButton();
+                return;
+            }
 
             if (!csrfToken) {
                 Swal.fire('Error', 'CSRF token tidak ditemukan. Refresh halaman.', 'error');
@@ -706,6 +1094,11 @@
                     },
                     body: JSON.stringify({
                         snapshot: snapshotData,
+                        coordinates: {
+                            latitude: geoState.latitude,
+                            longitude: geoState.longitude,
+                            accuracy: geoState.accuracy,
+                        },
                     }),
                 });
                 const data = await response.json();
@@ -722,16 +1115,39 @@
                 const isLate = statusLabel === 'Terlambat';
                 const shiftInfo = data.shift || {};
                 const actionType = data.action || 'clock_in';
+                const modalDetails = [
+                    `<p><strong>Status:</strong> ${statusLabel}</p>`,
+                    `<p><strong>Jam Shift:</strong> ${shiftInfo.jam_masuk || '-'}</p>`,
+                    `<p><strong>Jam Presensi:</strong> ${recordedTime || '-'}</p>`
+                ];
+                if (isLate) {
+                    modalDetails.push(`
+                        <div class="alert alert-warning mt-2" role="alert">
+                            Anda tercatat terlambat. Segera informasikan kepada atasan jika diperlukan.
+                        </div>
+                    `);
+                }
+                const radiusLimit = EMPLOYEE_LOCATION ? Number(EMPLOYEE_LOCATION.radius || 0) : null;
+                if (locationValidation.distanceMeters !== null && radiusLimit !== null) {
+                    const distanceText = `${locationValidation.distanceMeters.toFixed(1)} m`;
+                    const radiusStatusText = locationValidation.isInsideRadius ? 'Dalam Radius' : 'Di Luar Radius';
+                    modalDetails.push(`<p><strong>Jarak ke Lokasi:</strong> ${distanceText}</p>`);
+                    modalDetails.push(`<p><strong>Radius Ditentukan:</strong> ${radiusLimit} m</p>`);
+                    modalDetails.push(`<p><strong>Status Radius:</strong> ${radiusStatusText}</p>`);
+                    if (!locationValidation.isInsideRadius && radiusLimit > 0 && locationValidation.distanceMeters > radiusLimit) {
+                        modalDetails.push(`
+                            <div class="alert alert-danger mt-2" role="alert">
+                                Sistem mendeteksi Anda di luar radius lokasi. Dekati titik kantor untuk presensi berikutnya.
+                            </div>
+                        `);
+                    }
+                }
                 Swal.fire({
                     icon: isLate ? 'warning' : 'success',
-                    title: actionType === 'clock_out' ? 'Presensi Pulang Tercatat' : (isLate ? 'Presensi Tercatat (Terlambat)' : 'Presensi Masuk Tercatat'),
-                    html: `
-                        <div class="text-start">
-                            <p><strong>Status:</strong> ${statusLabel}</p>
-                            <p><strong>Jam Shift:</strong> ${shiftInfo.jam_masuk || '-'}</p>
-                            <p><strong>Jam Presensi:</strong> ${recordedTime || '-'}</p>
-                        </div>
-                    `,
+                    title: actionType === 'clock_out'
+                        ? 'Presensi Pulang Tercatat'
+                        : (isLate ? 'Presensi Tercatat (Terlambat)' : 'Presensi Masuk Tercatat'),
+                    html: `<div class="text-start">${modalDetails.join('')}</div>`,
                     allowOutsideClick: false,
                     showConfirmButton: true,
                     confirmButtonText: 'Ok'
@@ -863,7 +1279,7 @@
             }
 
             button.disabled = true;
-            button.classList.remove('btn-success', 'btn-warning', 'btn-primary');
+            button.classList.remove('btn-success', 'btn-warning', 'btn-primary', 'btn-secondary');
 
             if (actionMode === 'done') {
                 button.classList.add('btn-success');
@@ -874,6 +1290,24 @@
             if (actionMode === 'waiting') {
                 button.classList.add('btn-warning');
                 buttonText.innerText = 'Menunggu Jam Pulang';
+                return;
+            }
+
+            if (!EMPLOYEE_LOCATION) {
+                button.classList.add('btn-secondary');
+                buttonText.innerText = 'Lokasi kantor belum ditetapkan';
+                return;
+            }
+
+            if (!locationValidation.ready) {
+                button.classList.add('btn-secondary');
+                buttonText.innerText = 'Menunggu lokasi perangkat';
+                return;
+            }
+
+            if (!locationValidation.isInsideRadius) {
+                button.classList.add('btn-secondary');
+                buttonText.innerText = 'Anda di luar radius lokasi';
                 return;
             }
 
@@ -930,3 +1364,8 @@
 
 
 @endsection
+
+
+
+
+

@@ -16,14 +16,6 @@
                         <form action="{{ route('location.update', $location->id)  }}" method="POST">
                             @csrf
                             @method('PATCH')
-                            @php
-                                $timezoneOptions = [
-                                    'Asia/Jakarta' => 'Asia/Jakarta (WIB)',
-                                    'Asia/Makassar' => 'Asia/Makassar (WITA)',
-                                    'Asia/Jayapura' => 'Asia/Jayapura (WIT)',
-                                ];
-                            @endphp
-
                             <!-- Field Kota -->
                             <div class="mb-3">
                                 <label for="kota" class="form-label fw-semibold"><i
@@ -83,20 +75,6 @@
                                     class="form-control @error('radius') is-invalid @enderror" placeholder="Contoh: 500"
                                     value="{{ old('radius', $location->radius) }}">
                                 @error('radius')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
-
-                            <div class="mb-4">
-                                <label for="timezone" class="form-label fw-semibold"><i class="fas fa-globe me-2 text-primary"></i>Zona Waktu</label>
-                                <select name="timezone" id="timezone" class="form-select @error('timezone') is-invalid @enderror">
-                                    @foreach ($timezoneOptions as $tz => $label)
-                                        <option value="{{ $tz }}" {{ old('timezone', $location->timezone ?? 'Asia/Jakarta') === $tz ? 'selected' : '' }}>
-                                            {{ $label }}
-                                        </option>
-                                    @endforeach
-                                </select>
-                                @error('timezone')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>

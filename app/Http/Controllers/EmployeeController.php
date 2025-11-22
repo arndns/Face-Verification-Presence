@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\Face_Embedding;
 use App\Models\Shift;
 use App\Models\Presence;
+use App\Models\Location;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -27,8 +28,10 @@ class EmployeeController extends Controller
         $employee = $user?->employee;
         $todayPresence = null;
         $recentPresences = collect();
+        $location = null;
 
         if ($employee) {
+            $location = $this->resolveEmployeeLocation($employee);
             $todayPresence = $employee->presence()
                 ->whereDate('waktu_masuk', today())
                 ->latest('waktu_masuk')
@@ -80,9 +83,16 @@ class EmployeeController extends Controller
 
     public function webcam()
     {
-        $user = User::find(Auth::id());
+        $user = User::with(['employee.location'])->find(Auth::id());
 
-        return view('Employee.camera', compact('user'));
+        if ($user && $user->employee) {
+            $this->resolveEmployeeLocation($user->employee);
+        }
+
+        return view('Employee.camera', [
+            'user' => $user,
+            'employeeLocation' => optional($user?->employee)->location,
+        ]);
     }
 
     public function faceMatcher()
@@ -105,6 +115,9 @@ class EmployeeController extends Controller
     {
         $request->validate([
             'snapshot' => ['nullable', 'string'],
+            'coordinates.latitude' => ['required', 'numeric'],
+            'coordinates.longitude' => ['required', 'numeric'],
+            'coordinates.accuracy' => ['nullable', 'numeric'],
         ]);
 
         try {
@@ -114,9 +127,37 @@ class EmployeeController extends Controller
             if (!$employee) {
                 return response()->json(['error' => 'Data karyawan tidak ditemukan'], 404);
             }
+            $employee->loadMissing('location');
             $shift = $this->resolveEmployeeShift($employee);
             if (!$shift) {
                 return response()->json(['error' => 'Shift karyawan belum ditetapkan'], 422);
+            }
+
+            $employeeLocation = $this->resolveEmployeeLocation($employee);
+            $coordinates = $request->input('coordinates', []);
+
+            if (!$employeeLocation) {
+                DB::rollBack();
+                return response()->json(['error' => 'Lokasi presensi belum ditetapkan untuk akun Anda'], 422);
+            }
+
+            $deviceLatitude = (float) data_get($coordinates, 'latitude');
+            $deviceLongitude = (float) data_get($coordinates, 'longitude');
+            $allowedRadius = max((float) $employeeLocation->radius, 0);
+            $distanceMeters = $this->calculateDistanceInMeters(
+                $deviceLatitude,
+                $deviceLongitude,
+                (float) $employeeLocation->latitude,
+                (float) $employeeLocation->longitude
+            );
+
+            if ($allowedRadius > 0 && $distanceMeters > $allowedRadius) {
+                DB::rollBack();
+                return response()->json([
+                    'error' => 'Anda berada di luar radius lokasi kantor.',
+                    'distance_meters' => round($distanceMeters, 2),
+                    'allowed_radius' => $allowedRadius,
+                ], 422);
             }
 
             $timezone = optional($employee->location)->timezone ?? config('app.timezone');
@@ -211,7 +252,8 @@ class EmployeeController extends Controller
             return response()->json(['error' => 'Data karyawan tidak ditemukan'], 404);
         }
 
-        $timezone = optional($employee->location)->timezone ?? config('app.timezone');
+        $location = $this->resolveEmployeeLocation($employee);
+        $timezone = optional($location)->timezone ?? config('app.timezone');
         $now = now($timezone);
         $shift = $this->resolveEmployeeShift($employee);
         if (!$shift) {
@@ -342,6 +384,44 @@ class EmployeeController extends Controller
         $employee->setRelation('shift', $defaultShift);
 
         return $defaultShift;
+    }
+
+    protected function resolveEmployeeLocation(Employee $employee): ?Location
+    {
+        $employee->loadMissing('location');
+
+        if ($employee->location) {
+            return $employee->location;
+        }
+
+        $defaultLocation = Location::orderBy('id')->first();
+        if (!$defaultLocation) {
+            return null;
+        }
+
+        $employee->location()->associate($defaultLocation);
+        $employee->save();
+        $employee->setRelation('location', $defaultLocation);
+
+        return $defaultLocation;
+    }
+
+    protected function calculateDistanceInMeters(float $latitude1, float $longitude1, float $latitude2, float $longitude2): float
+    {
+        $earthRadius = 6371000; // meters
+        $latFrom = deg2rad($latitude1);
+        $lonFrom = deg2rad($longitude1);
+        $latTo = deg2rad($latitude2);
+        $lonTo = deg2rad($longitude2);
+
+        $latDelta = $latTo - $latFrom;
+        $lonDelta = $lonTo - $lonFrom;
+
+        $a = sin($latDelta / 2) ** 2 +
+            cos($latFrom) * cos($latTo) * sin($lonDelta / 2) ** 2;
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+        return $earthRadius * $c;
     }
 
 }

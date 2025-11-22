@@ -30,7 +30,6 @@ class LocationController extends Controller
             'latitude' => ['required'],
             'longitude' => ['required'],
             'radius' => ['required', 'numeric'],
-            'timezone' => ['required', 'timezone'],
         ]);
 
         try {
@@ -69,7 +68,6 @@ class LocationController extends Controller
             'latitude'  => ['sometimes', 'filled', 'string'],
             'longitude' => ['sometimes', 'filled', 'string'],
             'radius'    => ['sometimes', 'filled', 'numeric', 'min:0'],
-            'timezone'  => ['sometimes', 'filled', 'timezone'],
         ];
 
         $data = $request->validate($rules);
