@@ -255,8 +255,7 @@
                     nama_shift: "{{ $presenceReminder['shift_name'] ?? '-' }}",
                     jam_masuk: "{{ $presenceReminder['shift_start'] ?? '-' }}",
                     jam_pulang: "{{ $presenceReminder['shift_end'] ?? '-' }}",
-                    current_time: "{{ $presenceReminder['current_time'] ?? '--:--' }}",
-                    timezone: "{{ $presenceReminder['timezone'] ?? config('app.timezone') }}",
+                    current_time: "{{ $presenceReminder['current_time'] ?? '--:--' }}"
                 };
 
                 Swal.fire({
@@ -265,7 +264,7 @@
                     html: `<div class="text-start">
                             <p>Shift <strong>${shiftInfo.nama_shift}</strong> sudah dimulai.</p>
                             <p><strong>Jam Masuk:</strong> ${shiftInfo.jam_masuk}</p>
-                            <p><strong>Waktu Saat Ini:</strong> ${shiftInfo.current_time} (${shiftInfo.timezone})</p>
+                            <p><strong>Waktu Saat Ini:</strong> ${shiftInfo.current_time}</p>
                             <p class="mb-1"><strong>Jam Pulang:</strong> ${shiftInfo.jam_pulang}</p>
                             <p class="text-muted mb-0">Segera lakukan presensi agar tidak dianggap terlambat.</p>
                         </div>`,
