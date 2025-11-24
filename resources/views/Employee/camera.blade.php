@@ -3,14 +3,13 @@
 @section('header')
     <div class="appHeader text-light p-3 d-flex align-items-center justify-content-between shadow-sm">
         <div class="left">
-
-            <a href="javascript:;" class="headerButton goBack text-light">
+            <a href="javascript:;" class="headerButton goBack text-light" onclick="confirmExit()">
                 <!-- Font Awesome back icon -->
                 <i class="fas fa-chevron-left fa-lg"></i>
             </a>
         </div>
         <div class="pageTitle h5 mb-0">
-            Attandance Employee
+            Attendance Employee
         </div>
         <div class="right" style="width: 24px;">
 
@@ -31,17 +30,17 @@
                     Kamera...</span>
             </div>
         </div>
-        <div class="w-100 mb-4">
+        <div class="w-100 mb-3">
             <button id="takeattandance"
                 class="w-100 btn btn-primary btn-lg fw-bold rounded-3 shadow d-flex align-items-center justify-content-center gap-3"
                 data-user-id="{{ $user->employee->id }}" disabled> <i class="fa-solid fa-camera fa-lg"></i>
                 <span id="button-text">Wajah Tidak Terdeteksi</span>
             </button>
         </div>
-        <div class="w-100 mb-4">
+        <div class="w-100 mb-2">
             <div id="locationAlertWrapper"
-                class="alert alert-secondary small mb-3 d-flex align-items-start justify-content-between gap-2" role="alert">
-                <div id="locationValidationStatusText">
+                class="alert alert-secondary small mb-2 d-flex align-items-start justify-content-between gap-2 py-2" role="alert">
+                <div id="locationValidationStatusText" class="small">
                     @if ($employeeLocationInfo)
                         Menunggu pembacaan lokasi perangkat...
                     @else
@@ -53,7 +52,7 @@
                     &times;
                 </button>
             </div>
-            <div id="map"></div>
+            <div id="map" style="height: 100px; border-radius: 8px;"></div>
         </div>
     </div>
 
@@ -68,14 +67,16 @@
         }
 
         #map {
-            height: 200px;
-            margin-bottom: 120px;
+            height: 100px;
+            margin-bottom: 10px;
             position: relative;
             z-index: 1;
+            border-radius: 8px;
+            overflow: hidden;
         }
 
         .camera-page {
-            padding-bottom: 140px;
+            padding-bottom: 90px;
         }
     </style>
 
@@ -147,6 +148,29 @@
         let locationAlertDismissed = false;
         let locationAlertLastType = null;
         let locationAlertLastMessage = null;
+
+        function confirmExit() {
+            if (window.Swal && typeof Swal.fire === 'function') {
+                Swal.fire({
+                    title: 'Keluar dari Halaman Presensi?',
+                    text: 'Proses presensi akan dibatalkan.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'Ya, Keluar',
+                    cancelButtonText: 'Batal'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = '{{ route('employee.index') }}';
+                    }
+                });
+            } else {
+                if (confirm('Keluar dari halaman presensi?')) {
+                    window.location.href = '{{ route('employee.index') }}';
+                }
+            }
+        }
 
         function initializeGeolocation() {
             const isSecure = window.isSecureContext || ['localhost', '127.0.0.1'].includes(location.hostname);

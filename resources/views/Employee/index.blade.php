@@ -49,14 +49,15 @@
                         </div>
                     </div>
                 </div>
-                <div class="logout-button">
-                    <form action="{{ route('logout') }}" method="POST" id="logout-form">
-                        @csrf
-                        <a href="{{ route('logout') }}"
-                            onclick="event.preventDefault(); document.getElementById('logout-form').submit();"><i
-                                class="fa-solid fa-sign-out-alt"></i></a>
-                    </form>
+                <div class="notification-button position-relative">
+                    <a href="#" data-bs-toggle="modal" data-bs-target="#notificationModal" class="text-white">
+                        <i class="fa-regular fa-bell" style="font-size: 1.5rem;"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle" style="width: 10px; height: 10px;">
+                            <span class="visually-hidden">New alerts</span>
+                        </span>
+                    </a>
                 </div>
+
             </div>
             <div class="user-status">
                 <div>
@@ -88,6 +89,7 @@
                         </small>
                     </div>
                 </div>
+
             </div>
         </div>
 
@@ -164,20 +166,20 @@
                             $rows = $groupedPresences->get($weekStart, collect())->sortBy('waktu_masuk');
                         @endphp
                         <div class="{{ $weekStart === $currentWeekKey ? '' : 'd-none' }}" data-week="{{ $weekStart }}" data-week-label="{{ $startDate->translatedFormat('d M') . ' - ' . $endDate->translatedFormat('d M') }}">
-                            <table class="table table-sm history-table align-middle mb-0">
+                            <table class="table history-table align-middle mb-0 w-100">
                                 <thead>
                                     <tr>
-                                        <th scope="col">Tanggal</th>
-                                        <th scope="col">Waktu Masuk</th>
-                                        <th scope="col">Waktu Pulang</th>
+                                        <th scope="col" style="width: 40%;">Tanggal</th>
+                                        <th scope="col" style="width: 30%;" class="text-center">Masuk</th>
+                                        <th scope="col" style="width: 30%;" class="text-center">Pulang</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach ($rows as $presence)
                                         <tr>
-                                            <td>{{ optional($presence->waktu_masuk ?? $presence->waktu_pulang)->translatedFormat('d M Y') ?? '-' }}</td>
-                                            <td>{{ optional($presence->waktu_masuk)->format('H:i') ?? '-' }}</td>
-                                            <td>{{ optional($presence->waktu_pulang)->format('H:i') ?? '-' }}</td>
+                                            <td class="py-3">{{ optional($presence->waktu_masuk ?? $presence->waktu_pulang)->translatedFormat('d M Y') ?? '-' }}</td>
+                                            <td class="text-center py-3">{{ optional($presence->waktu_masuk)->format('H:i') ?? '-' }}</td>
+                                            <td class="text-center py-3">{{ optional($presence->waktu_pulang)->format('H:i') ?? '-' }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -190,6 +192,46 @@
                         <p class="mb-0 text-muted">Belum ada data presensi. Mulai dengan menekan tombol kamera.</p>
                     </div>
                 @endif
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Modal -->
+    <div class="modal fade" id="notificationModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Notifikasi</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="list-group list-group-flush">
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1 text-primary">Pengajuan Cuti Disetujui</h6>
+                                <small class="text-muted">Baru saja</small>
+                            </div>
+                            <p class="mb-1 small">Pengajuan cuti sakit Anda untuk tanggal 25 Nov telah disetujui oleh Admin.</p>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Presensi Berhasil</h6>
+                                <small class="text-muted">Hari ini</small>
+                            </div>
+                            <p class="mb-1 small">Anda telah melakukan presensi masuk pada pukul 08:00.</p>
+                        </a>
+                        <a href="#" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">Pengingat Shift</h6>
+                                <small class="text-muted">Kemarin</small>
+                            </div>
+                            <p class="mb-1 small">Jangan lupa presensi pulang sebelum pukul 17:00.</p>
+                        </a>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-secondary w-100" data-bs-dismiss="modal">Tutup</button>
+                </div>
             </div>
         </div>
     </div>
@@ -273,12 +315,12 @@
             function checkLocation() {
                 if (!navigator.geolocation) {
                     statusText.textContent = 'Browser Anda tidak mendukung geolocation.';
-                    statusText.classList.add('text-danger');
+                    statusText.classList.add('text-danger-bold');
                     return;
                 }
 
                 statusText.textContent = 'Mengambil koordinat perangkat...';
-                statusText.classList.remove('text-danger', 'text-success');
+                statusText.classList.remove('text-danger-bold', 'text-success-bold');
 
                 navigator.geolocation.getCurrentPosition((position) => {
                     const {
@@ -289,11 +331,11 @@
 
                     statusText.textContent = `Posisi Anda ${distance.toFixed(0)} m dari kantor.`;
                     if (distance <= officeRadius) {
-                        statusText.classList.add('text-success');
-                        statusText.classList.remove('text-danger');
+                        statusText.classList.add('text-success-bold');
+                        statusText.classList.remove('text-danger-bold');
                     } else {
-                        statusText.classList.add('text-danger');
-                        statusText.classList.remove('text-success');
+                        statusText.classList.add('text-danger-bold');
+                        statusText.classList.remove('text-success-bold');
                     }
 
                     // Show and initialize map
@@ -332,7 +374,7 @@
                         message = 'Izin lokasi ditolak. Aktifkan GPS untuk memanfaatkan deteksi lokasi.';
                     }
                     statusText.textContent = message;
-                    statusText.classList.add('text-danger');
+                    statusText.classList.add('text-danger-bold');
                 }, {
                     enableHighAccuracy: true,
                     timeout: 10000

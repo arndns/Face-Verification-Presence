@@ -531,20 +531,34 @@ body {
 
 .history-table th {
     color: #475569;
-    font-weight: 700;
-    font-size: 0.9rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     border-color: var(--border);
+    padding: 12px 8px !important;
 }
 
 .history-table td {
     color: #0f172a;
     font-size: 0.95rem;
     border-color: var(--border);
+    padding: 12px 8px !important;
 }
 
 .week-label {
     font-weight: 700;
     color: #1f2937;
+}
+
+.text-success-bold {
+    color: #15803d !important;
+    font-weight: 600;
+}
+
+.text-danger-bold {
+    color: #b91c1c !important;
+    font-weight: 600;
 }
 
 /* Kamera */

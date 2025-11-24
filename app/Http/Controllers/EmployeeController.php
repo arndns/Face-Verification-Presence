@@ -82,7 +82,7 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function webcam()
+    public function camera()
     {
         $user = User::with(['employee.location'])->find(Auth::id());
 
@@ -557,6 +557,31 @@ class EmployeeController extends Controller
         ]);
 
         return back()->with('success', 'Password berhasil diperbarui.');
+    }
+
+    public function getEmbedding()
+    {
+        $user = Auth::user();
+        
+        if (!$user) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $employee = $user->employee;
+        
+        if (!$employee) {
+            return response()->json(['error' => 'Data karyawan tidak ditemukan'], 404);
+        }
+
+        $faceEmbedding = $employee->faceEmbeddings;
+        
+        if (!$faceEmbedding || !$faceEmbedding->descriptor) {
+            return response()->json(['error' => 'Data embedding wajah Anda belum terekam. Silakan hubungi admin.'], 404);
+        }
+
+        return response()->json([
+            'descriptor' => $faceEmbedding->descriptor
+        ]);
     }
 
 }

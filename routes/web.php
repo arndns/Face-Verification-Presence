@@ -67,6 +67,9 @@ Route::middleware('auth')->group(function () {
         }
         return response()->file($path);
     })->where('path', '.*')->name('storage.file');
+    
+    // API-like route for getting employee face embedding (used by camera page)
+    Route::get('/api/employee/embedding', [EmployeeController::class, 'getEmbedding'])->name('api.employee.embedding');
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
