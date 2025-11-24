@@ -72,7 +72,7 @@
                                         </td>
                                         <td>
                                             @if ($user->foto)
-                                                <img src="{{ Storage::url($user->foto) }}" alt="avatar"
+                                                <img src="{{ route('storage.file', $user->foto) }}" alt="avatar"
                                                     class="imaged w64 rounded-circle"
                                                     style="width: 100px; height: 100px; object-fit: cover;">
                                             @else

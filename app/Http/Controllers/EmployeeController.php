@@ -12,6 +12,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
@@ -481,12 +482,12 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function createLeave()
+    public function createPermit()
     {
-        return view('Employee.leave.create');
+        return view('Employee.permit.create');
     }
 
-    public function storeLeave(Request $request)
+    public function storePermit(Request $request)
     {
         $validated = $request->validate([
             'start_date' => 'required|date|after_or_equal:today',
@@ -502,7 +503,7 @@ class EmployeeController extends Controller
             return redirect()->back()->with('error', 'Data karyawan tidak ditemukan.');
         }
 
-        \App\Models\Leave::create([
+        \App\Models\Permit::create([
             'employee_id' => $employee->id,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
@@ -511,10 +512,10 @@ class EmployeeController extends Controller
             'status' => 'pending',
         ]);
 
-        return redirect()->route('employee.leave.history')->with('success', 'Pengajuan cuti berhasil dikirim!');
+        return redirect()->route('employee.permit.history')->with('success', 'Pengajuan cuti berhasil dikirim!');
     }
 
-    public function leaveHistory()
+    public function permitHistory()
     {
         $user = Auth::user();
         $employee = $user?->employee;
@@ -523,11 +524,39 @@ class EmployeeController extends Controller
             return redirect()->route('employee.index')->with('error', 'Data karyawan tidak ditemukan.');
         }
 
-        $leaves = \App\Models\Leave::where('employee_id', $employee->id)
+        $permits = \App\Models\Permit::where('employee_id', $employee->id)
             ->orderBy('created_at', 'desc')
             ->paginate(10);
 
-        return view('Employee.leave.history', compact('leaves'));
+        return view('Employee.permit.history', compact('permits'));
+    }
+
+    public function profile()
+    {
+        $user = Auth::user();
+        $employee = $user?->employee;
+        
+        return view('Employee.profile', compact('user', 'employee'));
+    }
+
+    public function updatePassword(Request $request)
+    {
+        $request->validate([
+            'current_password' => 'required',
+            'new_password' => 'required|min:6|confirmed',
+        ]);
+
+        $user = Auth::user();
+
+        if (!Hash::check($request->current_password, $user->password)) {
+            return back()->with('error', 'Password saat ini salah.');
+        }
+
+        $user->update([
+            'password' => Hash::make($request->new_password)
+        ]);
+
+        return back()->with('success', 'Password berhasil diperbarui.');
     }
 
 }

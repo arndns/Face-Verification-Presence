@@ -40,22 +40,33 @@ Route::middleware('auth')->group(function () {
 
         Route::resource('/admin/shifts', ShiftController::class)->except(['show']);
         Route::get('/admin/presence/history', [AdminController::class, 'presenceHistory'])->name('admin.presence.history');
-        Route::get('/admin/leave', [AdminController::class, 'leaveIndex'])->name('admin.leave.index');
-        Route::post('/admin/leave/{leave}/approve', [AdminController::class, 'approveLeave'])->name('admin.leave.approve');
-        Route::post('/admin/leave/{leave}/reject', [AdminController::class, 'rejectLeave'])->name('admin.leave.reject');
+        Route::get('/admin/permit', [AdminController::class, 'permitIndex'])->name('admin.permit.index');
+        Route::post('/admin/permit/{permit}/approve', [AdminController::class, 'approvePermit'])->name('admin.permit.approve');
+        Route::post('/admin/permit/{permit}/reject', [AdminController::class, 'rejectPermit'])->name('admin.permit.reject');
+        Route::put('/admin/permit/{permit}/update', [AdminController::class, 'updatePermit'])->name('admin.permit.update');
     });
 
     Route::middleware('role:employee')->group(function () {
         Route::get('/employee/dashboard', [EmployeeController::class, 'index'])->name('employee.index');
-        Route::get('/employee/camera', [EmployeeController::class, 'webcam'])->name('employee.camera');
-        Route::get('/api/employee/embedding', [EmployeeController::class, 'faceMatcher']);
+        Route::get('/employee/camera', [EmployeeController::class, 'camera'])->name('employee.camera');
+        Route::post('/employee/presence/store', [EmployeeController::class, 'store'])->name('employee.store');
         Route::get('/employee/presence/status', [EmployeeController::class, 'presenceStatus'])->name('employee.presence.status');
-        Route::post('/presence/store', [EmployeeController::class, 'presence']);
         Route::get('employee/history/presence', [EmployeeController::class, 'history_presence'])->name('employee.presence.history');
-        Route::get('/employee/leave/create', [EmployeeController::class, 'createLeave'])->name('employee.leave.create');
-        Route::post('/employee/leave/store', [EmployeeController::class, 'storeLeave'])->name('employee.leave.store');
-        Route::get('/employee/leave/history', [EmployeeController::class, 'leaveHistory'])->name('employee.leave.history');
+        Route::get('/employee/permit/create', [EmployeeController::class, 'createPermit'])->name('employee.permit.create');
+        Route::post('/employee/leave/store', [EmployeeController::class, 'storePermit'])->name('employee.permit.store');
+        Route::get('/employee/leave/history', [EmployeeController::class, 'permitHistory'])->name('employee.permit.history');
+        Route::get('/employee/profile', [EmployeeController::class, 'profile'])->name('employee.profile');
+        Route::post('/employee/profile/password', [EmployeeController::class, 'updatePassword'])->name('employee.update.password');
     });
+
+    // Fallback for storage files if symlink is missing
+    Route::get('/storage-file/{path}', function ($path) {
+        $path = storage_path('app/public/' . $path);
+        if (!file_exists($path)) {
+            abort(404);
+        }
+        return response()->file($path);
+    })->where('path', '.*')->name('storage.file');
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');

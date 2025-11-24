@@ -117,7 +117,7 @@ body {
     font-size: 22px;
 }
 
-.app-bottom-menu .camera-col i {
+.app-bottom-menu .camera-col>div {
     color: white;
     width: 50px;
     height: 50px;
@@ -127,6 +127,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    margin-bottom: 0px;
 }
 
 /* Header pengguna */
@@ -231,6 +232,14 @@ body {
     color: #e0f2fe;
 }
 
+.badge-time {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
+    min-width: 85px;
+    justify-content: center;
+}
+
 .logout-button a {
     color: white;
     font-size: 24px;
@@ -241,6 +250,50 @@ body {
 
 .logout-button a:hover {
     opacity: 1;
+}
+
+/* Server Time Display */
+.server-time-display {
+    margin-top: 16px;
+    position: relative;
+    z-index: 1;
+}
+
+.time-box {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    backdrop-filter: blur(10px);
+}
+
+.time-box i {
+    font-size: 1.5rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.time-content {
+    flex: 1;
+}
+
+.time-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: white;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+}
+
+.time-label {
+    display: block;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.75);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 2px;
 }
 
 .user-status {
@@ -304,12 +357,11 @@ body {
 /* CTA strip */
 .action-strip {
     margin: -64px 0 12px;
-    padding: 20px;
-    display: grid;
-    gap: 12px;
-    align-items: center;
     background: var(--surface);
     border: 1px solid var(--border);
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .cta-card {
@@ -319,37 +371,8 @@ body {
 
 @media (min-width: 768px) {
     .action-strip {
-        grid-template-columns: 1.4fr 1fr;
         margin: -72px auto 16px;
-        padding: 24px 28px;
     }
-}
-
-.action-strip__info small {
-    font-weight: 700;
-    letter-spacing: 0.04em;
-}
-
-.action-strip__cta {
-    text-align: left;
-}
-
-@media (min-width: 768px) {
-    .action-strip__cta {
-        justify-self: end;
-    }
-}
-
-.action-strip__cta .btn {
-    min-width: 200px;
-    box-shadow: 0 12px 26px rgba(37, 99, 235, 0.25);
-}
-
-.action-strip__cta .cta-note {
-    display: block;
-    margin-top: 6px;
-    font-size: 0.82rem;
-    color: #6b7280;
 }
 
 /* Insight grid */
@@ -442,6 +465,27 @@ body {
     border-radius: 10px;
     background: #f8fafc;
     border: 1px dashed #cbd5f5;
+}
+
+.location-map {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+#map-container {
+    width: 100%;
+    height: 400px;
+    /* Fallback untuk browser yang tidak support aspect-ratio */
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+}
+
+.custom-office-marker,
+.custom-user-marker {
+    background: transparent;
+    border: none;
 }
 
 /* History */

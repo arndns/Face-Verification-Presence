@@ -19,7 +19,7 @@
     <div class="container py-4">
         <div class="card shadow-sm">
             <div class="card-body">
-                <form action="{{ route('employee.leave.store') }}" method="POST">
+                <form action="{{ route('employee.permit.store') }}" method="POST">
                     @csrf
 
                     <div class="mb-3">
@@ -68,7 +68,7 @@
                     </div>
 
                     <div class="d-flex gap-2">
-                        <a href="{{ route('employee.leave.history') }}" class="btn btn-outline-secondary flex-fill">
+                        <a href="{{ route('employee.permit.history') }}" class="btn btn-outline-secondary flex-fill">
                             <i class="fas fa-history"></i> Riwayat Cuti
                         </a>
                         <button type="submit" class="btn btn-primary flex-fill">

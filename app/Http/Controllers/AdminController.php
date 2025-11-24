@@ -18,8 +18,18 @@ class AdminController extends Controller
 {
     public function index()
     {
+        $today = date('Y-m-d');
+        
+        $totalEmployees = \App\Models\Employee::count();
+        
+        $presenceToday = \App\Models\Presence::where('tanggal_presensi', $today)->count();
+        
+        $permitsToday = \App\Models\Permit::where('status', 'approved')
+            ->whereDate('start_date', '<=', $today)
+            ->whereDate('end_date', '>=', $today)
+            ->count();
 
-        return view('Admin.index');
+        return view('Admin.index', compact('totalEmployees', 'presenceToday', 'permitsToday'));
     }
 
     public function viewdata()
@@ -215,9 +225,9 @@ class AdminController extends Controller
         return view('Admin.presence.history', compact('presences'));
     }
 
-    public function leaveIndex(Request $request)
+    public function permitIndex(Request $request)
     {
-        $query = \App\Models\Leave::with('employee');
+        $query = \App\Models\Permit::with('employee');
 
         // Filter by status
         if ($request->filled('status')) {
@@ -233,36 +243,51 @@ class AdminController extends Controller
             });
         }
 
-        $leaves = $query->orderBy('created_at', 'desc')->paginate(15);
+        $permits = $query->orderBy('created_at', 'desc')->paginate(15);
 
-        return view('Admin.leave.index', compact('leaves'));
+        return view('Admin.permit.index', compact('permits'));
     }
 
-    public function approveLeave(Request $request, \App\Models\Leave $leave)
+    public function approvePermit(Request $request, \App\Models\Permit $permit)
     {
         $validated = $request->validate([
             'admin_note' => 'nullable|string|max:500'
         ]);
 
-        $leave->update([
+        $permit->update([
             'status' => 'approved',
             'admin_note' => $validated['admin_note'] ?? null
         ]);
 
-        return redirect()->route('admin.leave.index')->with('success', 'Pengajuan cuti berhasil disetujui!');
+        return redirect()->route('admin.permit.index')->with('success', 'Pengajuan cuti berhasil disetujui!');
     }
 
-    public function rejectLeave(Request $request, \App\Models\Leave $leave)
+    public function rejectPermit(Request $request, \App\Models\Permit $permit)
     {
         $validated = $request->validate([
             'admin_note' => 'required|string|max:500'
         ]);
 
-        $leave->update([
+        $permit->update([
             'status' => 'rejected',
             'admin_note' => $validated['admin_note']
         ]);
 
-        return redirect()->route('admin.leave.index')->with('success', 'Pengajuan cuti telah ditolak.');
+        return redirect()->route('admin.permit.index')->with('success', 'Pengajuan cuti telah ditolak.');
+    }
+
+    public function updatePermit(Request $request, \App\Models\Permit $permit)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:pending,approved,rejected',
+            'admin_note' => 'nullable|string|max:500'
+        ]);
+
+        $permit->update([
+            'status' => $validated['status'],
+            'admin_note' => $validated['admin_note']
+        ]);
+
+        return redirect()->route('admin.permit.index')->with('success', 'Status pengajuan cuti berhasil diperbarui.');
     }
 }

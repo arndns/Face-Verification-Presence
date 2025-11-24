@@ -110,3 +110,12 @@ Setelah menjalankan `php artisan db:seed`, terdapat 2 user default:
   - Badge status warna-warni
   - Catatan admin (jika ada)
   - Pagination
+
+### Dashboard Features
+- **Jam Server Real-time**: Menampilkan waktu server yang update setiap detik
+- **Peta Lokasi**: 
+  - Muncul setelah klik tombol "Periksa Lokasi Saya"
+  - Menampilkan marker lokasi kantor (biru) dan lokasi pegawai (hijau)
+  - Radius area kantor ditampilkan dalam circle
+  - Auto zoom untuk menampilkan kedua marker
+  - Menggunakan Leaflet.js dengan OpenStreetMap
