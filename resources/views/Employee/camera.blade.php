@@ -21,38 +21,40 @@
         $employeeLocationInfo = $employeeLocation ?? optional(optional($user)->employee)->location;
     @endphp
     <div class="p-4 camera-page">
-        <div class="w-100 mb-4" data-camera-wrapper>
-            <input type="hidden" id="location" placeholder="Menunggu lokasi..." readonly>
-            <!-- Wadah tidak akan melebihi lebar .w-100 -->
-            <div class="camera-capture text-muted"
-                style="position:relative;width:100%;max-width:720px;aspect-ratio:720/520;background:#000;overflow:hidden;border-radius:8px;">
-                <span style="position:absolute;inset:auto auto 8px 8px;z-index:3;color:#fff;opacity:.8;">Memuat
-                    Kamera...</span>
-            </div>
-        </div>
-        <div class="w-100 mb-3">
-            <button id="takeattandance"
-                class="w-100 btn btn-primary btn-lg fw-bold rounded-3 shadow d-flex align-items-center justify-content-center gap-3"
-                data-user-id="{{ $user->employee->id }}" disabled> <i class="fa-solid fa-camera fa-lg"></i>
-                <span id="button-text">Wajah Tidak Terdeteksi</span>
-            </button>
-        </div>
-        <div class="w-100 mb-2">
-            <div id="locationAlertWrapper"
-                class="alert alert-secondary small mb-2 d-flex align-items-start justify-content-between gap-2 py-2" role="alert">
-                <div id="locationValidationStatusText" class="small">
-                    @if ($employeeLocationInfo)
-                        Menunggu pembacaan lokasi perangkat...
-                    @else
-                        Lokasi presensi belum ditetapkan. Hubungi admin untuk bantuan.
-                    @endif
+        <div class="camera-shell mx-auto">
+            <div class="w-100 mb-4" data-camera-wrapper>
+                <input type="hidden" id="location" placeholder="Menunggu lokasi..." readonly>
+                <!-- Wadah tidak akan melebihi lebar .w-100 -->
+                <div class="camera-capture text-muted"
+                    style="position:relative;width:100%;aspect-ratio:720/520;background:#000;overflow:hidden;border-radius:8px;">
+                    <span style="position:absolute;inset:auto auto 8px 8px;z-index:3;color:#fff;opacity:.8;">Memuat
+                        Kamera...</span>
                 </div>
-                <button type="button" class="btn btn-sm btn-light text-muted px-2 py-0"
-                    aria-label="Tutup notifikasi" onclick="dismissLocationAlert()">
-                    &times;
+            </div>
+            <div class="w-100 mb-3">
+                <button id="takeattandance"
+                    class="w-100 btn btn-primary btn-lg fw-bold rounded-3 shadow d-flex align-items-center justify-content-center gap-3"
+                    data-user-id="{{ $user->employee->id }}" disabled> <i class="fa-solid fa-camera fa-lg"></i>
+                    <span id="button-text">Wajah Tidak Terdeteksi</span>
                 </button>
             </div>
-            <div id="map" style="height: 100px; border-radius: 8px;"></div>
+            <div class="w-100 mb-2">
+                <div id="locationAlertWrapper"
+                    class="alert alert-secondary small mb-2 d-flex align-items-start justify-content-between gap-2 py-2" role="alert">
+                    <div id="locationValidationStatusText" class="small">
+                        @if ($employeeLocationInfo)
+                            Menunggu pembacaan lokasi perangkat...
+                        @else
+                            Lokasi presensi belum ditetapkan. Hubungi admin untuk bantuan.
+                        @endif
+                    </div>
+                    <button type="button" class="btn btn-sm btn-light text-muted px-2 py-0"
+                        aria-label="Tutup notifikasi" onclick="dismissLocationAlert()">
+                        &times;
+                    </button>
+                </div>
+                <div id="map" style="height: 200px; border-radius: 8px;"></div>
+            </div>
         </div>
     </div>
 
@@ -66,13 +68,20 @@
             position: absolute;
         }
 
+        .camera-shell {
+            max-width: 720px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
         #map {
-            height: 100px;
+            height: 200px;
             margin-bottom: 10px;
             position: relative;
             z-index: 1;
             border-radius: 8px;
             overflow: hidden;
+            width: 100%;
         }
 
         .camera-page {

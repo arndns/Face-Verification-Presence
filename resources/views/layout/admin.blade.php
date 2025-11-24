@@ -32,12 +32,24 @@
             </div>
 
             <ul class="list-unstyled components">
-                <li><a href="{{ route('admin.index') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
-                <li><a href="{{ route('admin.data') }}"><i class="fas fa-users"></i> Data Pegawai</a></li>
-                <li><a href="{{ route('location.index') }}"><i class="fas fa-map-location-dot"></i> Lokasi Kantor</a></li>
-                <li><a href="{{ route('shifts.index') }}"><i class="fas fa-business-time"></i> Pengaturan Shift</a></li>
-                <li><a href="{{ route('admin.permit.index') }}"><i class="fas fa-calendar-check"></i> Pengajuan Cuti</a></li>
-                <li><a href="{{ route('admin.presence.history') }}"><i class="fas fa-history"></i> Riwayat Presensi</a></li>
+                <li class="{{ request()->routeIs('admin.index') ? 'active' : '' }}">
+                    <a href="{{ route('admin.index') }}"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                </li>
+                <li class="{{ request()->routeIs('admin.data*') ? 'active' : '' }}">
+                    <a href="{{ route('admin.data') }}"><i class="fas fa-users"></i> Data Pegawai</a>
+                </li>
+                <li class="{{ request()->routeIs('location.*') ? 'active' : '' }}">
+                    <a href="{{ route('location.index') }}"><i class="fas fa-map-location-dot"></i> Lokasi Kantor</a>
+                </li>
+                <li class="{{ request()->routeIs('shifts.*') ? 'active' : '' }}">
+                    <a href="{{ route('shifts.index') }}"><i class="fas fa-business-time"></i> Pengaturan Shift</a>
+                </li>
+                <li class="{{ request()->routeIs('admin.permit.*') ? 'active' : '' }}">
+                    <a href="{{ route('admin.permit.index') }}"><i class="fas fa-calendar-check"></i> Pengajuan Cuti</a>
+                </li>
+                <li class="{{ request()->routeIs('admin.presence.*') ? 'active' : '' }}">
+                    <a href="{{ route('admin.presence.history') }}"><i class="fas fa-history"></i> Riwayat Presensi</a>
+                </li>
             </ul>
 
             <ul class="list-unstyled CTAs">

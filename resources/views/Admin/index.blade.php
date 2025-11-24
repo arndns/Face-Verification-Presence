@@ -5,7 +5,7 @@
     <!-- Kartu Statistik -->
     <div class="row g-4 mb-4">
         <div class="col-md-6 col-lg-3">
-            <div class="card stat-card bg-primary text-white">
+            <div class="card stat-card stat-total">
                 <div class="card-body">
                     <div>
                         <h5 class="card-title">Total Pegawai</h5>
@@ -16,7 +16,7 @@
             </div>
         </div>
         <div class="col-md-6 col-lg-3">
-            <div class="card stat-card bg-success text-white">
+            <div class="card stat-card stat-present">
                 <div class="card-body">
                     <div>
                         <h5 class="card-title">Hadir Hari Ini</h5>
@@ -27,7 +27,7 @@
             </div>
         </div>
         <div class="col-md-6 col-lg-3">
-            <div class="card stat-card bg-warning text-white">
+            <div class="card stat-card stat-permit">
                 <div class="card-body">
                     <div>
                         <h5 class="card-title">Izin / Sakit</h5>
@@ -38,11 +38,11 @@
             </div>
         </div>
         <div class="col-md-6 col-lg-3">
-            <div class="card stat-card bg-danger text-white">
+            <div class="card stat-card stat-absent">
                 <div class="card-body">
                     <div>
                         <h5 class="card-title">Belum Hadir</h5>
-                        <p class="card-text fs-4 fw-bold">{{ $totalEmployees - $presenceToday - $permitsToday }}</p>
+                        <p class="card-text fs-4 fw-bold">{{ max(0, $totalEmployees - $presenceToday - $permitsToday) }}</p>
                     </div>
                     <div class="stat-icon"><i class="fas fa-user-clock"></i></div>
                 </div>

@@ -3,24 +3,26 @@ document.addEventListener("DOMContentLoaded", function () {
     const sidebarCollapse = document.getElementById("sidebarCollapse");
     const sidebarClose = document.getElementById("sidebarClose");
     const backdrop = document.querySelector(".sidebar-backdrop");
+    const sidebarStateKey = "adminSidebarCollapsed";
 
     if (sidebar && sidebarCollapse && sidebarClose && backdrop) {
-        // Selalu tutup sidebar saat halaman dimuat
-        sidebar.classList.add("collapsed");
+        const savedState = localStorage.getItem(sidebarStateKey);
+        const shouldCollapse = savedState === "true";
+        sidebar.classList.toggle("collapsed", shouldCollapse);
 
-        // Logika untuk tombol BUKA
         sidebarCollapse.addEventListener("click", function () {
             sidebar.classList.remove("collapsed");
+            localStorage.setItem(sidebarStateKey, "false");
         });
 
-        // Logika untuk tombol TUTUP
         sidebarClose.addEventListener("click", function () {
             sidebar.classList.add("collapsed");
+            localStorage.setItem(sidebarStateKey, "true");
         });
 
-        // Logika untuk backdrop
         backdrop.addEventListener("click", function () {
             sidebar.classList.add("collapsed");
+            localStorage.setItem(sidebarStateKey, "true");
         });
     }
 });
