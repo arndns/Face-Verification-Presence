@@ -46,9 +46,9 @@
             <i class="fa-solid fa-home"></i>
             <strong>Home</strong>
         </a>
-        <a href="#" class="item">
-            <i class="fa-solid fa-wallet"></i>
-            <strong>Pendapatan</strong>
+        <a href="{{ route('employee.leave.history') }}" class="item">
+            <i class="fa-solid fa-calendar-days"></i>
+            <strong>Ajukan Cuti</strong>
         </a>
 
         <a href="{{ route('employee.camera') }}" class="item camera-col">

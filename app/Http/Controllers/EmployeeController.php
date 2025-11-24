@@ -481,4 +481,53 @@ class EmployeeController extends Controller
         ]);
     }
 
+    public function createLeave()
+    {
+        return view('Employee.leave.create');
+    }
+
+    public function storeLeave(Request $request)
+    {
+        $validated = $request->validate([
+            'start_date' => 'required|date|after_or_equal:today',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'leave_type' => 'required|in:sakit,izin,cuti_tahunan',
+            'reason' => 'required|string|max:500',
+        ]);
+
+        $user = Auth::user();
+        $employee = $user?->employee;
+
+        if (!$employee) {
+            return redirect()->back()->with('error', 'Data karyawan tidak ditemukan.');
+        }
+
+        \App\Models\Leave::create([
+            'employee_id' => $employee->id,
+            'start_date' => $validated['start_date'],
+            'end_date' => $validated['end_date'],
+            'leave_type' => $validated['leave_type'],
+            'reason' => $validated['reason'],
+            'status' => 'pending',
+        ]);
+
+        return redirect()->route('employee.leave.history')->with('success', 'Pengajuan cuti berhasil dikirim!');
+    }
+
+    public function leaveHistory()
+    {
+        $user = Auth::user();
+        $employee = $user?->employee;
+
+        if (!$employee) {
+            return redirect()->route('employee.index')->with('error', 'Data karyawan tidak ditemukan.');
+        }
+
+        $leaves = \App\Models\Leave::where('employee_id', $employee->id)
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        return view('Employee.leave.history', compact('leaves'));
+    }
+
 }

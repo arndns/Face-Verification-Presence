@@ -181,4 +181,88 @@ class AdminController extends Controller
                 ->with('error', 'Terjadi kesalahan. Data gagal dihapus.');
         }
     }
+
+    public function presenceHistory(Request $request)
+    {
+        $query = DB::table('presences')
+            ->join('employees', 'presences.employee_id', '=', 'employees.id')
+            ->select(
+                'presences.*',
+                'employees.nik',
+                'employees.nama',
+                'employees.jabatan'
+            );
+
+        // Filter by employee name or NIK
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('employees.nama', 'LIKE', "%{$search}%")
+                  ->orWhere('employees.nik', 'LIKE', "%{$search}%");
+            });
+        }
+
+        // Filter by date range
+        if ($request->filled('date_from')) {
+            $query->whereDate('presences.waktu_masuk', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('presences.waktu_masuk', '<=', $request->date_to);
+        }
+
+        $presences = $query->orderBy('presences.waktu_masuk', 'desc')->paginate(15);
+
+        return view('Admin.presence.history', compact('presences'));
+    }
+
+    public function leaveIndex(Request $request)
+    {
+        $query = \App\Models\Leave::with('employee');
+
+        // Filter by status
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Filter by employee name
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('employee', function ($q) use ($search) {
+                $q->where('nama', 'LIKE', "%{$search}%")
+                  ->orWhere('nik', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $leaves = $query->orderBy('created_at', 'desc')->paginate(15);
+
+        return view('Admin.leave.index', compact('leaves'));
+    }
+
+    public function approveLeave(Request $request, \App\Models\Leave $leave)
+    {
+        $validated = $request->validate([
+            'admin_note' => 'nullable|string|max:500'
+        ]);
+
+        $leave->update([
+            'status' => 'approved',
+            'admin_note' => $validated['admin_note'] ?? null
+        ]);
+
+        return redirect()->route('admin.leave.index')->with('success', 'Pengajuan cuti berhasil disetujui!');
+    }
+
+    public function rejectLeave(Request $request, \App\Models\Leave $leave)
+    {
+        $validated = $request->validate([
+            'admin_note' => 'required|string|max:500'
+        ]);
+
+        $leave->update([
+            'status' => 'rejected',
+            'admin_note' => $validated['admin_note']
+        ]);
+
+        return redirect()->route('admin.leave.index')->with('success', 'Pengajuan cuti telah ditolak.');
+    }
 }

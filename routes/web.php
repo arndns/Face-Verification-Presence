@@ -39,6 +39,10 @@ Route::middleware('auth')->group(function () {
         Route::delete('/admin/location/{location}/delete', [LocationController::class, 'destroy'])->name('location.delete');
 
         Route::resource('/admin/shifts', ShiftController::class)->except(['show']);
+        Route::get('/admin/presence/history', [AdminController::class, 'presenceHistory'])->name('admin.presence.history');
+        Route::get('/admin/leave', [AdminController::class, 'leaveIndex'])->name('admin.leave.index');
+        Route::post('/admin/leave/{leave}/approve', [AdminController::class, 'approveLeave'])->name('admin.leave.approve');
+        Route::post('/admin/leave/{leave}/reject', [AdminController::class, 'rejectLeave'])->name('admin.leave.reject');
     });
 
     Route::middleware('role:employee')->group(function () {
@@ -48,6 +52,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/employee/presence/status', [EmployeeController::class, 'presenceStatus'])->name('employee.presence.status');
         Route::post('/presence/store', [EmployeeController::class, 'presence']);
         Route::get('employee/history/presence', [EmployeeController::class, 'history_presence'])->name('employee.presence.history');
+        Route::get('/employee/leave/create', [EmployeeController::class, 'createLeave'])->name('employee.leave.create');
+        Route::post('/employee/leave/store', [EmployeeController::class, 'storeLeave'])->name('employee.leave.store');
+        Route::get('/employee/leave/history', [EmployeeController::class, 'leaveHistory'])->name('employee.leave.history');
     });
 });
 

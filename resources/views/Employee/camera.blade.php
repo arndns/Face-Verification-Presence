@@ -745,9 +745,19 @@
             wrap.querySelector("span")?.remove(); // Hapus teks "Memuat Kamera..."
 
             Webcam.set({
+                width: 640,
+                height: 480,
                 image_format: "jpeg",
                 jpeg_quality: 90,
-                flip_horiz: true
+                flip_horiz: true,
+                constraints: {
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: "user"
+                    },
+                    audio: false
+                }
             });
 
             Webcam.on("live", () => {

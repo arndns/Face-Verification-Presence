@@ -1,0 +1,105 @@
+@extends('layout.employee')
+@section('title', 'Ajukan Cuti')
+
+@section('header')
+    <div class="appHeader text-light p-3 d-flex align-items-center justify-content-between shadow-sm">
+        <div class="left">
+            <a href="{{ route('employee.index') }}" class="headerButton goBack text-light">
+                <i class="fas fa-chevron-left fa-lg"></i>
+            </a>
+        </div>
+        <div class="pageTitle h5 mb-0">
+            Ajukan Cuti
+        </div>
+        <div class="right" style="width: 24px;"></div>
+    </div>
+@endsection
+
+@section('content')
+    <div class="container py-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form action="{{ route('employee.leave.store') }}" method="POST">
+                    @csrf
+
+                    <div class="mb-3">
+                        <label for="leave_type" class="form-label">Jenis Cuti <span class="text-danger">*</span></label>
+                        <select class="form-select @error('leave_type') is-invalid @enderror" id="leave_type" name="leave_type" required>
+                            <option value="">Pilih Jenis Cuti</option>
+                            <option value="sakit" {{ old('leave_type') == 'sakit' ? 'selected' : '' }}>Sakit</option>
+                            <option value="izin" {{ old('leave_type') == 'izin' ? 'selected' : '' }}>Izin</option>
+                            <option value="cuti_tahunan" {{ old('leave_type') == 'cuti_tahunan' ? 'selected' : '' }}>Cuti Tahunan</option>
+                        </select>
+                        @error('leave_type')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">Tanggal Mulai <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control @error('start_date') is-invalid @enderror" 
+                               id="start_date" name="start_date" value="{{ old('start_date') }}" 
+                               min="{{ date('Y-m-d') }}" required>
+                        @error('start_date')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">Tanggal Selesai <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control @error('end_date') is-invalid @enderror" 
+                               id="end_date" name="end_date" value="{{ old('end_date') }}" 
+                               min="{{ date('Y-m-d') }}" required>
+                        @error('end_date')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="reason" class="form-label">Alasan Cuti <span class="text-danger">*</span></label>
+                        <textarea class="form-control @error('reason') is-invalid @enderror" 
+                                  id="reason" name="reason" rows="4" 
+                                  placeholder="Jelaskan alasan pengajuan cuti Anda..." 
+                                  maxlength="500" required>{{ old('reason') }}</textarea>
+                        <small class="text-muted">Maksimal 500 karakter</small>
+                        @error('reason')
+                            <div class="invalid-feedback">{{ $message }}</div>
+                        @enderror
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <a href="{{ route('employee.leave.history') }}" class="btn btn-outline-secondary flex-fill">
+                            <i class="fas fa-history"></i> Riwayat Cuti
+                        </a>
+                        <button type="submit" class="btn btn-primary flex-fill">
+                            <i class="fas fa-paper-plane"></i> Kirim Pengajuan
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="alert alert-info mt-3">
+            <i class="fas fa-info-circle"></i>
+            <strong>Informasi:</strong>
+            <ul class="mb-0 mt-2">
+                <li>Pengajuan cuti akan diverifikasi oleh admin.</li>
+                <li>Anda akan mendapat notifikasi setelah pengajuan diproses.</li>
+                <li>Pastikan mengisi data dengan lengkap dan jelas.</li>
+            </ul>
+        </div>
+    </div>
+@endsection
+
+@section('script')
+    <script>
+        // Sync end date with start date
+        document.getElementById('start_date').addEventListener('change', function() {
+            const endDateInput = document.getElementById('end_date');
+            if (!endDateInput.value || endDateInput.value < this.value) {
+                endDateInput.min = this.value;
+                endDateInput.value = this.value;
+            }
+        });
+    </script>
+@endsection
