@@ -49,7 +49,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:employee')->group(function () {
         Route::get('/employee/dashboard', [EmployeeController::class, 'index'])->name('employee.index');
         Route::get('/employee/camera', [EmployeeController::class, 'camera'])->name('employee.camera');
-        Route::post('/employee/presence/store', [EmployeeController::class, 'store'])->name('employee.store');
+        Route::post('/employee/presence/store', [EmployeeController::class, 'presence'])->name('employee.store');
         Route::get('/employee/presence/status', [EmployeeController::class, 'presenceStatus'])->name('employee.presence.status');
         Route::get('employee/history/presence', [EmployeeController::class, 'history_presence'])->name('employee.presence.history');
         Route::get('/employee/permit/create', [EmployeeController::class, 'createPermit'])->name('employee.permit.create');

@@ -17,9 +17,6 @@
     </div>
 @endsection
 @section('content')
-    @php
-        $employeeLocationInfo = $employeeLocation ?? optional(optional($user)->employee)->location;
-    @endphp
     <div class="p-4 camera-page">
         <div class="camera-shell mx-auto">
             <div class="w-100 mb-4" data-camera-wrapper>
@@ -92,18 +89,6 @@
 
 @endsection
 @section('script')
-    @php
-        $employeeLocationPayload = $employeeLocationInfo
-            ? [
-                'id' => $employeeLocationInfo->id,
-                'kota' => $employeeLocationInfo->kota,
-                'alamat' => $employeeLocationInfo->alamat,
-                'latitude' => $employeeLocationInfo->latitude !== null ? (float) $employeeLocationInfo->latitude : null,
-                'longitude' => $employeeLocationInfo->longitude !== null ? (float) $employeeLocationInfo->longitude : null,
-                'radius' => $employeeLocationInfo->radius !== null ? (float) $employeeLocationInfo->radius : null,
-            ]
-            : null;
-    @endphp
     <script>
         // --- Variabel Global ---
         const EMPLOYEE_LOCATION = @json($employeeLocationPayload);
@@ -1174,7 +1159,7 @@
             });
 
             try {
-                const response = await fetch('/presence/store', {
+                const response = await fetch('/employee/presence/store', {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': csrfToken,

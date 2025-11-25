@@ -86,13 +86,26 @@ class EmployeeController extends Controller
     {
         $user = User::with(['employee.location'])->find(Auth::id());
 
-        if ($user && $user->employee) {
-            $this->resolveEmployeeLocation($user->employee);
-        }
+        $employeeLocation = $user && $user->employee
+            ? $this->resolveEmployeeLocation($user->employee)
+            : null;
+
+        $employeeLocationPayload = $employeeLocation
+            ? [
+                'id' => $employeeLocation->id,
+                'kota' => $employeeLocation->kota,
+                'alamat' => $employeeLocation->alamat,
+                'latitude' => $employeeLocation->latitude !== null ? (float) $employeeLocation->latitude : null,
+                'longitude' => $employeeLocation->longitude !== null ? (float) $employeeLocation->longitude : null,
+                'radius' => $employeeLocation->radius !== null ? (float) $employeeLocation->radius : null,
+            ]
+            : null;
 
         return view('Employee.camera', [
             'user' => $user,
-            'employeeLocation' => optional($user?->employee)->location,
+            'employeeLocation' => $employeeLocation,
+            'employeeLocationInfo' => $employeeLocation,
+            'employeeLocationPayload' => $employeeLocationPayload,
         ]);
     }
 
@@ -490,7 +503,8 @@ class EmployeeController extends Controller
     public function storePermit(Request $request)
     {
         $validated = $request->validate([
-            'start_date' => 'required|date|after_or_equal:today',
+            // Pengajuan harus dilakukan minimal H-1 sebelum tanggal mulai
+            'start_date' => 'required|date|after:today',
             'end_date' => 'required|date|after_or_equal:start_date',
             'leave_type' => 'required|in:sakit,izin,cuti_tahunan',
             'reason' => 'required|string|max:500',

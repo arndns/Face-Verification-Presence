@@ -22,7 +22,8 @@ class AdminController extends Controller
         
         $totalEmployees = \App\Models\Employee::count();
         
-        $presenceToday = \App\Models\Presence::where('tanggal_presensi', $today)->count();
+        // Presence records store the clock-in time in `waktu_masuk`, so filter by that date
+        $presenceToday = \App\Models\Presence::whereDate('waktu_masuk', $today)->count();
         
         $permitsToday = \App\Models\Permit::where('status', 'approved')
             ->whereDate('start_date', '<=', $today)

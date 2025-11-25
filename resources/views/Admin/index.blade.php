@@ -2,7 +2,6 @@
 @section('title', 'Dashboard')
 @section('content')
     <!-- Kartu Statistik -->
-    <!-- Kartu Statistik -->
     <div class="row g-4 mb-4">
         <div class="col-md-6 col-lg-3">
             <div class="card stat-card stat-total">

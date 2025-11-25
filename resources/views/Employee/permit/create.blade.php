@@ -35,11 +35,14 @@
                         @enderror
                     </div>
 
+                    @php
+                        $minPermitDate = date('Y-m-d', strtotime('+1 day'));
+                    @endphp
                     <div class="mb-3">
                         <label for="start_date" class="form-label">Tanggal Mulai <span class="text-danger">*</span></label>
                         <input type="date" class="form-control @error('start_date') is-invalid @enderror" 
                                id="start_date" name="start_date" value="{{ old('start_date') }}" 
-                               min="{{ date('Y-m-d') }}" required>
+                               min="{{ $minPermitDate }}" required>
                         @error('start_date')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -49,7 +52,7 @@
                         <label for="end_date" class="form-label">Tanggal Selesai <span class="text-danger">*</span></label>
                         <input type="date" class="form-control @error('end_date') is-invalid @enderror" 
                                id="end_date" name="end_date" value="{{ old('end_date') }}" 
-                               min="{{ date('Y-m-d') }}" required>
+                               min="{{ $minPermitDate }}" required>
                         @error('end_date')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -93,13 +96,19 @@
 
 @section('script')
     <script>
-        // Sync end date with start date
-        document.getElementById('start_date').addEventListener('change', function() {
-            const endDateInput = document.getElementById('end_date');
-            if (!endDateInput.value || endDateInput.value < this.value) {
-                endDateInput.min = this.value;
-                endDateInput.value = this.value;
+        // Sync end date with start date (H-1 rule already enforced via min attr)
+        const startInput = document.getElementById('start_date');
+        const endInput = document.getElementById('end_date');
+
+        const enforceMinDate = () => {
+            const minDate = startInput.value || startInput.min;
+            endInput.min = minDate;
+            if (endInput.value < minDate) {
+                endInput.value = minDate;
             }
-        });
+        };
+
+        startInput.addEventListener('change', enforceMinDate);
+        enforceMinDate();
     </script>
 @endsection
