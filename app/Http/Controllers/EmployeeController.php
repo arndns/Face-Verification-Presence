@@ -44,7 +44,7 @@ class EmployeeController extends Controller
                 ->get();
         }
 
-        $faceRegistered = (bool) optional($employee?->faceEmbeddings)->id;
+        $faceRegistered = $employee ? $employee->faceEmbeddings()->exists() : false;
         $location = $employee?->location;
         $shift = null;
         $shiftStart = null;
@@ -116,12 +116,12 @@ class EmployeeController extends Controller
         if (!$employee) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
-        $embedding = Face_Embedding::where('employee_id', $employee->id)->first();;
-        if (!$embedding) {
+        $embeddings = $this->collectEmployeeEmbeddings($employee);
+        if ($embeddings->isEmpty()) {
             return response()->json(['error' => 'Data wajah referensi tidak ditemukan'], 404);
         }
         return response()->json([
-            'descriptor' => $embedding->descriptor
+            'embeddings' => $embeddings,
         ]);
     }
 
@@ -438,6 +438,35 @@ class EmployeeController extends Controller
         return $earthRadius * $c;
     }
 
+    protected function collectEmployeeEmbeddings(Employee $employee)
+    {
+        return $employee->faceEmbeddings()
+            ->get()
+            ->filter(function (Face_Embedding $embedding) {
+                return !empty($embedding->descriptor);
+            })
+            ->map(function (Face_Embedding $embedding) {
+                $descriptor = $embedding->descriptor;
+
+                if (is_string($descriptor)) {
+                    $decoded = json_decode($descriptor, true);
+                    $descriptor = is_array($decoded) ? $decoded : [];
+                }
+
+                if (is_array($descriptor)) {
+                    $descriptor = array_map('floatval', $descriptor);
+                } else {
+                    $descriptor = [];
+                }
+
+                return [
+                    'orientation' => $embedding->orientation ?? 'front',
+                    'descriptor' => $descriptor,
+                ];
+            })
+            ->values();
+    }
+
     public function history_presence(Request $request){
         $user = Auth::user();
         $employee = $user?->employee;
@@ -587,14 +616,16 @@ class EmployeeController extends Controller
             return response()->json(['error' => 'Data karyawan tidak ditemukan'], 404);
         }
 
-        $faceEmbedding = $employee->faceEmbeddings;
+        $embeddings = $this->collectEmployeeEmbeddings($employee);
         
-        if (!$faceEmbedding || !$faceEmbedding->descriptor) {
+        if ($embeddings->isEmpty()) {
             return response()->json(['error' => 'Data embedding wajah Anda belum terekam. Silakan hubungi admin.'], 404);
         }
 
         return response()->json([
-            'descriptor' => $faceEmbedding->descriptor
+            'embeddings' => $embeddings,
+            'descriptor' => $embeddings->first()['descriptor'] ?? null,
+            'orientation' => $embeddings->first()['orientation'] ?? null,
         ]);
     }
 

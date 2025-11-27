@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Employee extends Model
 {
@@ -29,9 +28,9 @@ class Employee extends Model
 
     }
     
-    public function faceEmbeddings(): HasOne
+    public function faceEmbeddings(): HasMany
     {
-        return $this->hasOne(Face_Embedding::class);
+        return $this->hasMany(Face_Embedding::class);
     }
 
     public function presence(): HasMany

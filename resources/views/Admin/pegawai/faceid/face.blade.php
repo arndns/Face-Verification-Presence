@@ -5,11 +5,29 @@
 
     <div class="container mt-5">
 
+        @if (session('warning'))
+            <div class="alert alert-warning">
+                {{ session('warning') }}
+            </div>
+        @endif
+
         <div class="row g-4 justify-content-center">
 
             <div class="col-12 col-md-6">
                 <div class="camera-open"
                     style="position:relative;width:100%;max-width:720px;aspect-ratio:720/520;background:#000;overflow:hidden;border-radius:8px;">
+                    <div id="capture-loading" class="capture-loading d-none">
+                        <div class="spinner-border text-light" role="status" style="width: 2.5rem; height: 2.5rem;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div class="mt-2 fw-semibold" id="capture-loading-text">Memproses...</div>
+                    </div>
+                    <div class="distance-guide">
+                        <div class="guide-rect" id="guide-rect"></div>
+                        <div class="guide-text">Posisikan wajah di dalam kotak (jarak +/- 30-60 cm)</div>
+                        <div id="overlay-instruction" class="guide-subtext"></div>
+                    </div>
+                    <div id="orientation-hint" class="guide-hint"></div>
                 </div>
             </div>
 
@@ -31,10 +49,35 @@
                             <p class="h5 mb-0">{{ $employee->nik ?? 'N/A' }}</p>
                         </div>
                         <hr class="my-3">
-                        <div>
+                        <div class="mb-3">
                             <label class="form-label text-muted small mb-0">NAMA</label>
                             <p class="h5 mb-0">{{ $employee->nama ?? 'N/A' }}</p>
                         </div>
+
+                        <hr class="my-3">
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Pilih Arah Rekam</label>
+                            <select id="orientation" class="form-select">
+                                <option value="front">Depan</option>
+                                <option value="left">Miring Kiri</option>
+                                <option value="right">Miring Kanan</option>
+                                <option value="up">Menengadah (Atas)</option>
+                                <option value="down">Menunduk (Bawah)</option>
+                            </select>
+                            <small class="text-muted">Pilih satu arah lalu tekan "Rekam Wajah". Ulangi untuk tiap arah yang diperlukan.</small>
+                        </div>
+
+                    <div id="saved-orientations-wrapper" class="alert alert-info small {{ empty($existingEmbeddings) || $existingEmbeddings->isEmpty() ? 'd-none' : '' }}">
+                        <div class="fw-semibold mb-1">Data yang sudah tersimpan:</div>
+                        <div id="saved-orientations" class="d-flex flex-wrap gap-2">
+                            @foreach ($existingEmbeddings ?? [] as $embedding)
+                                <span class="badge bg-success text-uppercase">
+                                    {{ $embedding->orientation ?? 'front' }}
+                                </span>
+                            @endforeach
+                        </div>
+                    </div>
                     </div>
                 </div>
 
@@ -83,6 +126,77 @@
             font-weight: bold;
             color: #c0392b;
         }
+
+        .distance-guide {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 12;
+        }
+
+        .distance-guide .guide-rect {
+            width: 55%;
+            height: 55%;
+            border: 2px dashed rgba(255, 255, 255, 0.7);
+            border-radius: 12px;
+            box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(1px);
+        }
+
+        .distance-guide .guide-text {
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.55);
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .distance-guide .guide-subtext {
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.45);
+            color: #e5e7eb;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .guide-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 13;
+        }
+
+        .guide-rect.ideal {
+            border-color: rgba(52, 211, 153, 0.9);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.4);
+        }
+
+        .capture-loading {
+            position: absolute;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.35);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            z-index: 10;
+        }
     </style>
 @endsection
 
@@ -101,6 +215,11 @@
         });
 
         async function init() {
+            const overlayInstruction = document.getElementById('overlay-instruction');
+            if (overlayInstruction) overlayInstruction.innerText = 'Memuat model wajah...';
+            const hint = document.getElementById('orientation-hint');
+            if (hint) hint.innerText = 'Tunggu, model sedang dimuat';
+
             await ensureFaceAPI();
 
             Swal.fire({
@@ -217,14 +336,16 @@
             const video = document.querySelector(videoSelector);
             const employeeIdInput = document.getElementById('employee-id');
             const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+            const orientationSelect = document.getElementById('orientation');
+            const existingOrientations = new Set(
+                (@json(($existingEmbeddings ?? collect())->pluck('orientation')) || []).map(o => (o || '').toLowerCase())
+            );
+            const ALL_ORIENTATIONS = ['front', 'left', 'right', 'up', 'down'];
+            const adminDataUrl = document.getElementById('admin-data-route')?.href || null;
+            const savedWrapper = document.getElementById('saved-orientations-wrapper');
+            const savedList = document.getElementById('saved-orientations');
 
-            if (!button || !video || !employeeIdInput || !csrfTokenMeta) {
-                console.error("Elemen penting tidak ditemukan!");
-                console.error("Tombol 'rekamwajah'?", button);
-                console.error("Video?", video);
-                console.error("Input 'employee-id'?", employeeIdInput);
-                console.error("Meta 'csrf-token'?", csrfTokenMeta);
-
+            if (!button || !video || !employeeIdInput || !csrfTokenMeta || !orientationSelect) {
                 Swal.fire(
                     'Error Kritis',
                     'Elemen halaman penting (ID Karyawan atau Token) tidak ditemukan. Halaman tidak bisa berfungsi.',
@@ -236,36 +357,111 @@
             const employeeId = employeeIdInput.value;
             const csrfToken = csrfTokenMeta.getAttribute('content');
 
-            button.addEventListener('click', async () => {
+            const isAllComplete = () => ALL_ORIENTATIONS.every(o => existingOrientations.has(o));
+            const renderSavedOrientations = () => {
+                if (!savedWrapper || !savedList) return;
+                savedList.innerHTML = '';
+                existingOrientations.forEach((ori) => {
+                    const span = document.createElement('span');
+                    span.className = 'badge bg-success text-uppercase';
+                    span.textContent = ori || 'front';
+                    savedList.appendChild(span);
+                });
+                savedWrapper.classList.toggle('d-none', existingOrientations.size === 0);
+            };
+            renderSavedOrientations();
+
+            if (isAllComplete()) {
+                button.disabled = true;
+                button.innerText = 'Semua arah sudah tersimpan';
                 Swal.fire({
-                    title: 'Memproses Wajah...',
-                    text: 'Mendeteksi dan mengekstrak data. Harap tunggu...',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
+                    icon: 'success',
+                    title: 'Semua arah lengkap',
+                    text: 'Data wajah lengkap. Mengalihkan ke halaman data pegawai...',
+                    timer: 1200,
+                    showConfirmButton: false,
+                }).then(() => {
+                    if (adminDataUrl) {
+                        window.location.href = adminDataUrl;
                     }
                 });
+                return;
+            }
 
-                const opts = new faceapi.MtcnnOptions();
+            button.addEventListener('click', async () => {
+                const orientation = (orientationSelect.value || 'front').toLowerCase();
+                const overlayInstruction = document.getElementById('overlay-instruction');
+                const hint = document.getElementById('orientation-hint');
+                const message = `Arahkan wajah: ${orientation}`;
+                if (overlayInstruction) overlayInstruction.innerText = message;
+                if (hint) hint.innerText = message;
 
-                const detection = await faceapi.detectSingleFace(video, opts)
-                    .withFaceLandmarks()
-                    .withFaceDescriptor();
+                button.disabled = true;
+                button.innerText = 'Memproses...';
+                setLoading(true, 'Mengambil wajah...');
 
-                if (!detection) {
-                    Swal.fire('Gagal',
-                        'Wajah tidak terdeteksi dengan jelas. Posisikan wajah Anda lurus ke kamera dan coba lagi.',
-                        'error');
-                    return;
+                try {
+                    const detection = await faceapi.detectSingleFace(video, new faceapi.MtcnnOptions())
+                        .withFaceLandmarks()
+                        .withFaceDescriptor();
+
+                    if (!detection) {
+                        await Swal.fire('Gagal', 'Wajah tidak terdeteksi dengan jelas. Ulangi lagi.', 'error');
+                        return;
+                    }
+
+                    const descriptor = detection.descriptor;
+                    await saveDescriptorToAPI(employeeId, descriptor, csrfToken, orientation, {
+                        skipRedirect: false,
+                        existingSet: existingOrientations,
+                        allOrientations: ALL_ORIENTATIONS,
+                        adminDataUrl,
+                        buttonRef: button,
+                        onSaved: renderSavedOrientations,
+                    });
+                } catch (err) {
+                    console.error(err);
+                    await Swal.fire('Error', err.message || 'Gagal memproses wajah.', 'error');
+                } finally {
+                    setLoading(false);
+                    button.disabled = false;
+                    button.innerText = 'Rekam Wajah';
                 }
-
-                const descriptor = detection.descriptor;
-
-                await saveDescriptorToAPI(employeeId, descriptor, csrfToken);
             });
         }
 
-        async function saveDescriptorToAPI(employeeId, descriptor, csrfToken) {
+        async function captureQuickDescriptor(video, opts) {
+            const detection = await faceapi.detectSingleFace(video, opts)
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+            return detection ? detection.descriptor : null;
+        }
+
+        function waitMs(ms) {
+            return new Promise(res => setTimeout(res, ms));
+        }
+
+        function setLoading(isLoading, message = '') {
+            const overlay = document.getElementById('capture-loading');
+            const text = document.getElementById('capture-loading-text');
+            if (!overlay) return;
+            overlay.classList.toggle('d-none', !isLoading);
+            if (text && message) {
+                text.innerText = message;
+            }
+        }
+
+        async function saveDescriptorToAPI(employeeId, descriptor, csrfToken, orientation, options = {}) {
+            const {
+                skipRedirect = false,
+                existingSet = null,
+                allOrientations = null,
+                adminDataUrl = null,
+                buttonRef = null,
+                onSaved = null,
+            } = options;
+            const normalizeOri = (o) => (o || '').toLowerCase();
+            const targetOrientation = normalizeOri(orientation);
             try {
                 const response = await fetch('/api/save-embedding', {
                     method: 'POST',
@@ -275,37 +471,50 @@
                     },
                     body: JSON.stringify({
                         employee_id: employeeId,
-                        descriptor: Array.from(descriptor)
+                        descriptor: Array.from(descriptor),
+                        orientation: orientation || 'front',
                     })
                 });
 
                 const data = await response.json();
 
-                // Dapatkan URL redirect DARI AWAL
-                const redirectElement = document.getElementById('admin-data-route');
-                const redirectUrl = redirectElement ? redirectElement.href : null;
-
-                if (!redirectUrl) {
-                    console.error("Fatal Error: Elemen 'admin-data-route' tidak ditemukan!");
-                    Swal.fire('Error Kritis', 'URL Redirect admin.data tidak ditemukan.', 'error');
-                    return;
-                }
-
                 if (response.ok && data.success) {
-                    sessionStorage.setItem('showSuccessModal', data.message || 'Data wajah berhasil disimpan!');
+                    if (existingSet && orientation) {
+                        existingSet.add(targetOrientation);
+                    }
+                    if (typeof onSaved === 'function') {
+                        onSaved();
+                    }
 
-                    // 2. Langsung redirect
-                    window.location.href = redirectUrl;
+                    const savedOrientation = (data.orientation || targetOrientation || 'front').toUpperCase();
+                    const successMessage = data.message
+                        ? `${data.message} (${savedOrientation})`
+                        : `Data wajah (${savedOrientation}) berhasil disimpan!`;
 
-                } else {
-                    // Gagal dari server (bukan error koneksi)
-                    Swal.fire({
-                        title: 'Gagal!',
-                        text: data.message || 'Gagal menyimpan data.',
-                        icon: 'error',
-                        confirmButtonText: 'Coba Lagi'
-                    });
+                    const allCompleted = allOrientations
+                        ? allOrientations.every((o) => existingSet?.has(normalizeOri(o)))
+                        : false;
+
+                    if (!skipRedirect && allCompleted && adminDataUrl) {
+                        if (buttonRef) {
+                            buttonRef.disabled = true;
+                            buttonRef.innerText = 'Semua arah tersimpan';
+                        }
+                        sessionStorage.setItem('showSuccessModal', successMessage || 'Semua arah tersimpan');
+                        window.location.href = adminDataUrl;
+                    } else {
+                        await Swal.fire('Berhasil', successMessage, 'success');
+                    }
+                    return { success: true, data };
                 }
+
+                Swal.fire({
+                    title: 'Gagal!',
+                    text: data.message || 'Gagal menyimpan data.',
+                    icon: 'error',
+                    confirmButtonText: 'Coba Lagi'
+                });
+                return { success: false, data };
 
             } catch (error) {
                 console.error("Error saving descriptor:", error);

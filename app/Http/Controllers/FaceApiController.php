@@ -12,15 +12,27 @@ class FaceApiController extends Controller
 {
     public function addfaceid($id)
     {
-        $hasEmbedding = Face_Embedding::where('employee_id', $id)->exists();
-        if ($hasEmbedding) {
-            return redirect()->route('admin.data')
-                ->with('warning', 'Pegawai sudah melakukan pengenalan wajah');
-        }
         $employee = Employee::findOrFail($id);
+        $existingEmbeddings = Face_Embedding::where('employee_id', $id)->get();
+        $existingOrientations = $existingEmbeddings
+            ->pluck('orientation')
+            ->filter()
+            ->map(fn ($o) => strtolower($o))
+            ->unique()
+            ->values();
+
+        $allOrientations = collect(['front', 'left', 'right', 'up', 'down']);
+        $hasAll = $allOrientations->every(fn ($ori) => $existingOrientations->contains($ori));
+
+        if ($hasAll) {
+            return redirect()
+                ->route('admin.data')
+                ->with('warning', 'Pegawai sudah merekam semua arah wajah. Perekaman ulang tidak diperlukan.');
+        }
         return view('Admin.pegawai.faceid.face', [
             'employee' => $employee,
-            'hasEmbedding' => $hasEmbedding
+            'hasEmbedding' => $existingEmbeddings->isNotEmpty(),
+            'existingEmbeddings' => $existingEmbeddings,
         ]);
     }
 
@@ -30,6 +42,7 @@ class FaceApiController extends Controller
         $validate = Validator::make($request->all(), [
             'employee_id' => 'required|integer|exists:employees,id',
             'descriptor'  => 'required|array|size:128',
+            'orientation' => 'required|string|in:front,left,right,up,down',
         ]);
 
         if ($validate->fails()) {
@@ -40,28 +53,29 @@ class FaceApiController extends Controller
             ], 400);
         }
 
-        $employeeId = $request->input('employee_id');
-        $existing = Face_Embedding::where('employee_id', $employeeId)->exists();
-        if ($existing) {
-            Log::warning('Gagal: Karyawan ID ' . $employeeId . ' sudah punya wajah.');
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal: Karyawan ini sudah memiliki data wajah yang tersimpan.',
-            ], 409); // 409 Conflict
-        }
+        $employeeId = (int) $request->input('employee_id');
+        $orientation = strtolower((string) $request->input('orientation', 'front'));
+        $descriptorArray = array_map('floatval', $request->descriptor);
+
         try {
 
-            $descriptorString = json_encode($request->descriptor);
+            $embedding = Face_Embedding::updateOrCreate(
+                [
+                    'employee_id' => $employeeId,
+                    'orientation' => $orientation,
+                ],
+                [
+                    'descriptor'  => $descriptorArray,
+                ]
+            );
 
-            $embedding = Face_Embedding::create([
-                'employee_id' => $request->employee_id,
-                'descriptor'  => $descriptorString,
-            ]);
+            $action = $embedding->wasRecentlyCreated ? 'disimpan' : 'diperbarui';
 
-            Log::info('Sukses: Wajah berhasil disimpan untuk ID ' . $request->employee_id);
+            Log::info("Sukses: Wajah berhasil {$action} untuk ID {$employeeId} ({$orientation}).");
             return response()->json([
                 'success' => true,
-                'message' => 'Data wajah berhasil didaftarkan'
+                'message' => "Data wajah berhasil {$action}.",
+                'orientation' => $embedding->orientation,
             ]);
         } catch (\Exception $e) {
             Log::error('Error 500:', ['message' => $e->getMessage()]);

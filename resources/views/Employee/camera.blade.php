@@ -104,7 +104,7 @@
         const FRAME_DELAY_MS = 120;
         const VIDEO_MIRRORED = true;
         const STATUS_POLL_INTERVAL_MS = 60000;
-        let referenceDescriptor; // Diisi saat init() dari API
+        let referenceEmbeddings = []; // Diisi saat init() dari API (multi-orientasi)
         let isVerifying = false;
         const presenceState = {
             hasCheckedIn: false,
@@ -607,7 +607,7 @@
 
         async function getReferenceEmbedding() {
             try {
-                console.log('🔄 Mengambil data referensi dari server...');
+                console.log('Mengambil data referensi dari server...');
                 const response = await fetch(`/api/employee/embedding`);
 
                 if (!response.ok) {
@@ -616,55 +616,87 @@
                 }
 
                 const data = await response.json();
-                console.log('📦 Raw data dari server:', data);
-                console.log('📊 Type descriptor:', typeof data.descriptor);
-                console.log('📝 Descriptor value:', data.descriptor);
+                const rawEmbeddings = Array.isArray(data.embeddings) ? data.embeddings : [];
 
-                let descriptorArray;
-
-                if (typeof data.descriptor === 'string') {
-                    console.log('🔧 Descriptor adalah string, melakukan parse...');
-                    try {
-                        descriptorArray = JSON.parse(data.descriptor);
-                        console.log('✅ Parse berhasil, hasil:', descriptorArray);
-                    } catch (parseError) {
-                        console.error('❌ Error parsing descriptor string:', parseError);
-                        console.error('❌ Descriptor content:', data.descriptor);
-                        console.error('❌ Karakter di posisi error:', data.descriptor.substring(0, 50));
-                        throw new Error('Format data descriptor tidak valid (JSON parse error)');
-                    }
-                } else if (Array.isArray(data.descriptor)) {
-                    console.log('✅ Descriptor sudah berupa array');
-                    descriptorArray = data.descriptor;
-                } else if (typeof data.descriptor === 'object' && data.descriptor !== null) {
-                    console.log('🔧 Descriptor adalah object, konversi ke array...');
-                    descriptorArray = Object.values(data.descriptor);
-                } else {
-                    console.error('❌ Format descriptor tidak dikenali:', data.descriptor);
-                    throw new Error('Format descriptor tidak dikenali');
+                if (!rawEmbeddings.length && data.descriptor) {
+                    rawEmbeddings.push({
+                        orientation: data.orientation || 'front',
+                        descriptor: data.descriptor,
+                    });
                 }
 
-                if (!descriptorArray || !Array.isArray(descriptorArray)) {
-                    throw new Error('Descriptor bukan array yang valid');
+                if (!rawEmbeddings.length) {
+                    throw new Error('Data embedding wajah belum tersedia. Hubungi admin.');
                 }
 
-                if (descriptorArray.length !== 128) {
-                    console.error(`❌ Panjang descriptor salah: ${descriptorArray.length} (seharusnya 128)`);
-                    throw new Error(`Descriptor tidak valid (panjang: ${descriptorArray.length}, seharusnya 128)`);
-                }
+                referenceEmbeddings = rawEmbeddings.map((item, index) => ({
+                    orientation: item.orientation || 'front',
+                    descriptor: normalizeDescriptor(item.descriptor, index),
+                }));
 
-                referenceDescriptor = new Float32Array(descriptorArray);
-
-                console.log('✅ Data referensi berhasil dimuat (128 float values)');
-                console.log('📊 Sample values:', Array.from(referenceDescriptor.slice(0, 5)));
+                console.log(`Data referensi berhasil dimuat (${referenceEmbeddings.length} orientasi)`);
 
             } catch (err) {
-                console.error('❌ Error mengambil embedding:', err);
-                console.error('❌ Stack trace:', err.stack);
+                console.error('Error mengambil embedding:', err);
+                console.error('Stack trace:', err.stack);
                 throw new Error(err.message || 'Data referensi wajah Anda tidak ditemukan.');
             }
         }
 
+        function normalizeDescriptor(descriptorInput, index = 0) {
+            let descriptorArray;
+
+            if (typeof descriptorInput === 'string') {
+                try {
+                    descriptorArray = JSON.parse(descriptorInput);
+                } catch (parseError) {
+                    throw new Error('Format data descriptor tidak valid (JSON parse error)');
+                }
+            } else if (Array.isArray(descriptorInput)) {
+                descriptorArray = descriptorInput;
+            } else if (typeof descriptorInput === 'object' && descriptorInput !== null) {
+                descriptorArray = Object.values(descriptorInput);
+            } else {
+                throw new Error('Format descriptor tidak dikenali');
+            }
+
+            if (!descriptorArray || !Array.isArray(descriptorArray)) {
+                throw new Error('Descriptor bukan array yang valid');
+            }
+
+            if (descriptorArray.length !== 128) {
+                throw new Error(
+                    `Descriptor tidak valid (orientasi ke-${index + 1}, panjang: ${descriptorArray.length}, seharusnya 128)`
+                );
+            }
+
+            return new Float32Array(descriptorArray);
+        }
+
+        function findBestReferenceDistance(descriptor) {
+            if (!referenceEmbeddings.length) {
+                return { distance: Infinity, orientation: null };
+            }
+
+            return referenceEmbeddings.reduce(
+                (best, current) => {
+                    if (!current.descriptor) {
+                        return best;
+                    }
+
+                    const distance = faceapi.euclideanDistance(descriptor, current.descriptor);
+                    if (distance < best.distance) {
+                        return {
+                            distance,
+                            orientation: current.orientation || 'front',
+                        };
+                    }
+
+                    return best;
+                },
+                { distance: Infinity, orientation: null }
+            );
+        }
 
         function waitForElement(selector, timeout = 5000) {
             return new Promise((resolve, reject) => {
@@ -827,7 +859,7 @@
             const buttonText = document.getElementById('button-text');
 
             async function loop() {
-                if (video.readyState < 2 || isVerifying || !referenceDescriptor) {
+                if (video.readyState < 2 || isVerifying || !referenceEmbeddings.length) {
                     requestAnimationFrame(loop);
                     return;
                 }
@@ -862,9 +894,9 @@
                         ctx.stroke();
 
                         let label = 'Tidak dikenali';
-                        if (result.descriptor && referenceDescriptor) {
-                            const distance = faceapi.euclideanDistance(result.descriptor, referenceDescriptor);
-                            if (distance < FACE_VERIFICATION_THRESHOLD) {
+                        if (result.descriptor && referenceEmbeddings.length) {
+                            const bestMatch = findBestReferenceDistance(result.descriptor);
+                            if (bestMatch.distance < FACE_VERIFICATION_THRESHOLD) {
                                 label = displayName;
                                 recognizedFaces++;
                             }
@@ -953,8 +985,8 @@
                 if (buttonText) buttonText.innerText = "Error: CSRF Token Hilang";
                 return;
             }
-            if (!referenceDescriptor) {
-                console.error("❌ Data referensi belum dimuat");
+            if (!referenceEmbeddings.length) {
+                console.error("Data referensi belum dimuat");
                 button.disabled = true;
                 const buttonText = document.getElementById('button-text');
                 if (buttonText) buttonText.innerText = "Error: Data Referensi Hilang";
@@ -1063,8 +1095,8 @@
                         return;
                     }
 
-                    const distances = collectedDescriptors.map(descriptor => faceapi.euclideanDistance(
-                        descriptor, referenceDescriptor));
+                    const distanceResults = collectedDescriptors.map(descriptor => findBestReferenceDistance(descriptor));
+                    const distances = distanceResults.map(result => result.distance);
                     const minDistance = Math.min(...distances);
                     const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
                     const matchCount = distances.filter(d => d < FACE_VERIFICATION_THRESHOLD).length;
