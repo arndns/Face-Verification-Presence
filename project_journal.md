@@ -5,23 +5,23 @@
 The project uses a PM2-based deployment system located in the `deploy/` directory. It is designed for Linux servers (Ubuntu/Debian/CentOS).
 
 ### Key Files
-- **`deploy/deploy.sh`**: Full deployment script.
+- **`deploy/linux/deploy.sh`**: Full deployment script.
   - Auto-installs system requirements (Node.js, PHP, Composer, PM2, Git).
   - Installs dependencies (npm & composer).
   - Builds frontend assets.
   - Optimizes Laravel caches.
   - Configures and starts the app with PM2.
   - Dynamically generates `ecosystem.config.cjs` with correct paths.
-- **`deploy/quick-update.sh`**: For minor updates.
+- **`deploy/linux/quick-update.sh`**: For minor updates.
   - Rebuilds frontend assets.
   - Clears config cache.
   - Restarts PM2 process.
-- **`deploy/ecosystem.config.cjs`**: PM2 configuration file (generated/overwritten by scripts).
-- **`deploy/PM2-DEPLOYMENT-GUIDE.md`**: Detailed documentation for the deployment process.
+- **`deploy/linux/ecosystem.config.cjs`**: PM2 configuration file (generated/overwritten by scripts).
+- **`deploy/linux/PM2-DEPLOYMENT-GUIDE.md`**: Detailed documentation for the deployment process.
 
 ### Deployment Workflow
-1.  **Full Deploy**: Run `./deploy.sh` from the `deploy` directory. Use for initial setup or major updates.
-2.  **Quick Update**: Run `./quick-update.sh` from the `deploy` directory. Use for code changes that don't affect dependencies.
+1.  **Full Deploy**: Run `./deploy.sh` from the `deploy/linux` directory. Use for initial setup or major updates.
+2.  **Quick Update**: Run `./quick-update.sh` from the `deploy/linux` directory. Use for code changes that don't affect dependencies.
 
 ### Server Requirements
 - Linux OS
@@ -53,8 +53,8 @@ The project uses a PM2-based deployment system located in the `deploy/` director
     npm run dev
     ```
 3.  **Quick Deploy Scripts**:
-    - `deploy/local-run.bat`: Full setup (install dependencies, migrate, build, serve).
-    - `deploy/local-quick.bat`: Quick run (build frontend, serve only).
+    - `deploy/windows/local-run.bat`: Full setup (install dependencies, migrate, build, serve).
+    - `deploy/windows/local-quick.bat`: Quick run (build frontend, serve only).
 
 ### Portable PHP Setup
 - **Location**: `bin/php/` (auto-created by `setup_portable.ps1`).
