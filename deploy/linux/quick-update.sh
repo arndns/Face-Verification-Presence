@@ -25,18 +25,13 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if we're in deploy directory
-if [ ! -f "../artisan" ]; then
-    print_error "This script must be run from deploy directory"
-    exit 1
-fi
-
-# Set project root to parent directory
-PROJECT_ROOT=$(dirname $(pwd))
+# Resolve paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 print_status "Project root detected: $PROJECT_ROOT"
 
 # Change to project root for all operations
-cd $PROJECT_ROOT
+cd "$PROJECT_ROOT"
 
 # Build frontend assets
 print_status "Building frontend assets..."
@@ -49,8 +44,8 @@ php artisan config:clear
 # Update ecosystem config with project root directory
 print_status "Updating PM2 ecosystem configuration with project root: $PROJECT_ROOT"
 
-# Create ecosystem config with dynamic path in deploy folder
-cat > deploy/ecosystem.config.cjs << EOF
+# Create ecosystem config with dynamic path in deploy/linux folder
+cat > "$SCRIPT_DIR/ecosystem.config.cjs" << EOF
 module.exports = {
   apps: [{
     name: 'face-verification-app',

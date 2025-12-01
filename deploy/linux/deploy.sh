@@ -30,18 +30,13 @@ print_warning() {
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
-# Check if we're in deploy directory
-if [ ! -f "../artisan" ]; then
-    print_error "This script must be run from deploy directory"
-    exit 1
-fi
-
-# Set project root to parent directory
-PROJECT_ROOT=$(dirname $(pwd))
+# Resolve paths
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 print_status "Project root detected: $PROJECT_ROOT"
 
 # Change to project root for all operations
-cd $PROJECT_ROOT
+cd "$PROJECT_ROOT"
 
 # Check and install requirements
 print_status "Checking system requirements..."
@@ -150,8 +145,8 @@ fi
 # Update ecosystem config with project root directory
 print_status "Updating PM2 ecosystem configuration with project root: $PROJECT_ROOT"
 
-# Create ecosystem config with dynamic path in deploy folder
-cat > deploy/ecosystem.config.cjs << EOF
+# Create ecosystem config with dynamic path in deploy/linux folder
+cat > "$SCRIPT_DIR/ecosystem.config.cjs" << EOF
 module.exports = {
   apps: [{
     name: 'face-verification-app',
@@ -180,7 +175,7 @@ EOF
 
 # Start application with PM2
 print_status "Starting application with PM2..."
-pm2 start deploy/ecosystem.config.cjs
+pm2 start "$SCRIPT_DIR/ecosystem.config.cjs"
 
 # Save PM2 configuration
 pm2 save

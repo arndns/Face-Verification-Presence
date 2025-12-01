@@ -112,6 +112,13 @@
             canCheckOut: false,
             lastClockIn: null,
             lastClockOut: null,
+            isOnLeave: false,
+            leaveInfo: null,
+        };
+        const LEAVE_LABELS = {
+            sakit: 'Sakit',
+            izin: 'Izin',
+            cuti_tahunan: 'Cuti Tahunan',
         };
         let hasShownCheckInReminder = false;
         let hasShownCheckoutReminder = false;
@@ -930,7 +937,12 @@
 
                     if (attendanceButton && buttonText) {
                         const actionMode = getCurrentActionMode();
-                        if (actionMode === 'done') {
+                        if (actionMode === 'on_leave') {
+                            attendanceButton.disabled = true;
+                            const leaveType = presenceState.leaveInfo?.leaveType;
+                            const leaveText = leaveType ? (LEAVE_LABELS[leaveType] || leaveType) : 'Izin';
+                            buttonText.innerText = `Sedang ${leaveText}`;
+                        } else if (actionMode === 'done') {
                             attendanceButton.disabled = true;
                             buttonText.innerText = 'Presensi Hari Ini Selesai';
                         } else if (actionMode === 'waiting') {
@@ -1010,6 +1022,11 @@
 
             button.addEventListener('click', async () => {
                 const actionMode = getCurrentActionMode();
+                if (actionMode === 'on_leave') {
+                    Swal.fire('Sedang Izin', 'Anda tidak perlu presensi karena izin sudah disetujui.', 'info');
+                    applyButtonIdleState();
+                    return;
+                }
                 if (actionMode === 'done') {
                     Swal.fire('Informasi', 'Anda sudah menyelesaikan presensi hari ini.', 'info');
                     applyButtonIdleState();
@@ -1329,6 +1346,20 @@
             presenceState.canCheckOut = Boolean(data.presence && data.presence.can_check_out);
             presenceState.lastClockIn = data.presence?.waktu_masuk || null;
             presenceState.lastClockOut = data.presence?.waktu_pulang || null;
+            presenceState.isOnLeave = Boolean(data.presence && data.presence.is_on_leave);
+            presenceState.leaveInfo = presenceState.isOnLeave ? {
+                leaveType: data.presence?.leave_type || null,
+                leaveStart: data.presence?.leave_start || null,
+                leaveEnd: data.presence?.leave_end || null,
+            } : null;
+
+            if (presenceState.isOnLeave) {
+                presenceState.hasCheckedIn = false;
+                presenceState.hasCheckedOut = false;
+                presenceState.canCheckOut = false;
+                hasShownCheckInReminder = true;
+                hasShownCheckoutReminder = true;
+            }
 
             applyButtonIdleState();
 
@@ -1365,6 +1396,9 @@
         }
 
         function getCurrentActionMode() {
+            if (presenceState.isOnLeave) {
+                return 'on_leave';
+            }
             if (presenceState.hasCheckedOut) {
                 return 'done';
             }
@@ -1387,6 +1421,14 @@
 
             button.disabled = true;
             button.classList.remove('btn-success', 'btn-warning', 'btn-primary', 'btn-secondary');
+
+            if (actionMode === 'on_leave') {
+                button.classList.add('btn-secondary');
+                const leaveType = presenceState.leaveInfo?.leaveType;
+                const leaveText = leaveType ? (LEAVE_LABELS[leaveType] || leaveType) : 'Izin';
+                buttonText.innerText = `Sedang ${leaveText}`;
+                return;
+            }
 
             if (actionMode === 'done') {
                 button.classList.add('btn-success');

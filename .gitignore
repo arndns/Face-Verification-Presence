@@ -29,3 +29,5 @@ Thumbs.db
 /php.bat
 /composer.bat
 /setup_portable.ps1
+/node.bat
+/npm.bat

@@ -10,8 +10,26 @@ use App\Http\Controllers\ShiftController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return redirect('/login');
+    // Send authenticated users straight to their dashboard to avoid redirect loops
+    if (auth()->check()) {
+        return auth()->user()->role === 'admin'
+            ? redirect()->route('admin.index')
+            : redirect()->route('employee.index');
+    }
+
+    return redirect()->route('login');
 });
+
+// Fallback dashboard route used by guest middleware when the user is already authenticated
+Route::get('/dashboard', function () {
+    if (!auth()->check()) {
+        return redirect()->route('login');
+    }
+
+    return auth()->user()->role === 'admin'
+        ? redirect()->route('admin.index')
+        : redirect()->route('employee.index');
+})->name('dashboard');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'index'])->name('login');

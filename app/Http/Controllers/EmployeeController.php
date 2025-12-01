@@ -7,6 +7,7 @@ use App\Models\Face_Embedding;
 use App\Models\Shift;
 use App\Models\Presence;
 use App\Models\Location;
+use App\Models\Permit;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
+use Carbon\CarbonPeriod;
 
 class EmployeeController extends Controller
 {
@@ -269,7 +271,38 @@ class EmployeeController extends Controller
         $location = $this->resolveEmployeeLocation($employee);
         $timezone = optional($location)->timezone ?? config('app.timezone');
         $now = now($timezone);
+
+        $approvedPermitToday = $this->findApprovedPermitForDate($employee, $now);
         $shift = $this->resolveEmployeeShift($employee);
+
+        if ($approvedPermitToday) {
+            return response()->json([
+                'timezone' => $timezone,
+                'current_time' => $now->format('H:i:s'),
+                'shift' => [
+                    'nama_shift' => $shift?->nama_shift,
+                    'jam_masuk' => $shift?->jam_masuk,
+                    'jam_pulang' => $shift?->jam_pulang,
+                ],
+                'presence' => [
+                    'is_on_leave' => true,
+                    'leave_type' => $approvedPermitToday->leave_type,
+                    'leave_start' => optional($approvedPermitToday->start_date)?->toDateString(),
+                    'leave_end' => optional($approvedPermitToday->end_date)?->toDateString(),
+                    'has_checked_in' => false,
+                    'has_checked_out' => false,
+                    'can_check_out' => false,
+                    'waktu_masuk' => null,
+                    'waktu_pulang' => null,
+                    'status' => 'Izin',
+                ],
+                'reminders' => [
+                    'should_check_in' => false,
+                    'should_check_out' => false,
+                ],
+            ]);
+        }
+
         if (!$shift) {
             return response()->json(['error' => 'Shift karyawan belum ditetapkan'], 422);
         }
@@ -467,6 +500,26 @@ class EmployeeController extends Controller
             ->values();
     }
 
+    protected function findApprovedPermitForDate(Employee $employee, Carbon $date): ?Permit
+    {
+        return Permit::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $date->toDateString())
+            ->whereDate('end_date', '>=', $date->toDateString())
+            ->orderByDesc('start_date')
+            ->first();
+    }
+
+    protected function formatLeaveTypeLabel(?string $leaveType): string
+    {
+        return match ($leaveType) {
+            'sakit' => 'Sakit',
+            'izin' => 'Izin',
+            'cuti_tahunan' => 'Cuti Tahunan',
+            default => ucfirst((string) $leaveType),
+        };
+    }
+
     public function history_presence(Request $request){
         $user = Auth::user();
         $employee = $user?->employee;
@@ -513,6 +566,59 @@ class EmployeeController extends Controller
                 'status_badge' => $presence->waktu_pulang ? 'success' : 'warning',
             ];
         });
+
+        $existingDates = $histories
+            ->pluck('date_iso')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $approvedPermits = Permit::where('employee_id', $employee->id)
+            ->where('status', 'approved')
+            ->when($fromDate, fn($q) => $q->whereDate('end_date', '>=', $fromDate))
+            ->when($toDate, fn($q) => $q->whereDate('start_date', '<=', $toDate))
+            ->get();
+
+        foreach ($approvedPermits as $permit) {
+            $start = $permit->start_date ? Carbon::parse($permit->start_date) : null;
+            $end = $permit->end_date ? Carbon::parse($permit->end_date) : null;
+
+            if (!$start || !$end) {
+                continue;
+            }
+
+            $period = CarbonPeriod::create($start, $end);
+
+            foreach ($period as $day) {
+                $dateIso = $day->format('Y-m-d');
+
+                if ($fromDate && $dateIso < $fromDate) {
+                    continue;
+                }
+
+                if ($toDate && $dateIso > $toDate) {
+                    continue;
+                }
+
+                if ($existingDates->contains($dateIso)) {
+                    continue;
+                }
+
+                $histories->push([
+                    'date_iso' => $dateIso,
+                    'formatted_date' => $day->translatedFormat('l, d M Y'),
+                    'masuk' => '-',
+                    'pulang' => '-',
+                    'status_label' => 'Izin (' . $this->formatLeaveTypeLabel($permit->leave_type) . ')',
+                    'status_badge' => 'info',
+                ]);
+            }
+        }
+
+        $histories = $histories
+            ->sortByDesc('date_iso')
+            ->values()
+            ->take(50);
 
         return view('Employee.history_presence', [
             'employee' => $employee,
