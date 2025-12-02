@@ -178,3 +178,44 @@ Setelah menjalankan `php artisan db:seed`, terdapat 2 user default:
     - Added IDs to the "Mulai Presensi" button and the bottom navigation "Presensi" button.
     - Updated the `checkLocation` JavaScript function to dynamically disable these buttons if the calculated distance exceeds the office radius.
     - Added visual feedback (opacity, cursor change, text update) when buttons are disabled.
+
+## 2025-12-05 - Add 'Use Current Location' Button to Admin Map
+- **Objective**: Allow admins to easily set the office location to their current physical position.
+- **Changes**:
+  - **Frontend**: Modified `resources/views/Admin/lokasi/CRUD/update.blade.php`.
+    - Added a "Gunakan Lokasi Saya" button above the map.
+    - Implemented JavaScript logic to fetch current coordinates via Geolocation API and update the map marker, circle, and input fields.
+
+## 2025-12-05 - Optimize Camera Loading Speed
+- **Objective**: Reduce the wait time for the camera and face verification system to initialize.
+- **Changes**:
+  - **Frontend**: Modified `resources/views/Employee/camera.blade.php`.
+    - Switched Face Detection Model from `MTCNN` (heavy) to `SSD Mobilenet v1` (faster, modern standard).
+    - Implemented **Parallel Loading**: Now loads face models, fetches user embeddings, and initializes the camera simultaneously using `Promise.all`.
+    - Updated `init()` flow to start the camera feed as early as possible.
+
+## 2025-12-05 - Revert Model Change
+- **Objective**: User requested to keep the original MTCNN model.
+- **Changes**:
+  - **Frontend**: Reverted `resources/views/Employee/camera.blade.php` to use `MTCNN` instead of `SSD Mobilenet v1`.
+  - **Note**: Kept the parallel loading optimization (`Promise.all`) as it still provides a speed benefit without changing the model architecture.
+
+## 2025-12-05 - Preload AI Models on Dashboard
+- **Objective**: Further improve camera loading speed by fetching model files in the background while the user is on the dashboard.
+- **Changes**:
+  - **Frontend**: Modified `resources/views/Employee/index.blade.php`.
+    - Added a background script that runs 2 seconds after the dashboard loads.
+    - This script fetches the heavy AI model files (`mtcnn`, `face_recognition`, etc.) and stores them in the browser cache.
+    - **Result**: When the user clicks "Presensi", the browser loads the models from the local cache instead of downloading them, making the transition much faster.
+
+## 2025-12-05 - Auto-Redirect After Presence
+- **Objective**: Improve user flow by automatically redirecting the employee back to the dashboard after a successful check-in/check-out.
+- **Changes**:
+  - **Frontend**: Modified `resources/views/Employee/camera.blade.php`.
+    - Updated the success `Swal.fire` callback to redirect to `{{ route('employee.index') }}` when the user clicks "Ok".
+
+## 2025-12-05 - Offline Mode Support
+- **Objective**: Ensure the application works 100% offline (intranet) by hosting all dependencies locally.
+- **Changes**:
+  - **Assets**: Downloaded `face-api.min.js` from CDN and saved it to `public/assets/js/face-api.min.js`.
+  - **Frontend**: Updated `resources/views/Employee/camera.blade.php` to load `face-api.min.js` from the local server instead of the CDN.

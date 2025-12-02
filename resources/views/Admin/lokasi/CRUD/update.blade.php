@@ -44,7 +44,12 @@
 
                             <!-- Peta Lokasi -->
                             <div class="mb-3">
-                                <label class="form-label fw-semibold"><i class="fas fa-map-marked-alt me-2 text-primary"></i>Pilih Lokasi di Peta</label>
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label fw-semibold mb-0"><i class="fas fa-map-marked-alt me-2 text-primary"></i>Pilih Lokasi di Peta</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="useCurrentLocation">
+                                        <i class="fas fa-location-crosshairs me-1"></i> Gunakan Lokasi Saya
+                                    </button>
+                                </div>
                                 <div id="map" style="height: 400px; width: 100%; border-radius: 8px; border: 1px solid #ced4da;"></div>
                                 <small class="text-muted">Geser marker atau klik pada peta untuk menentukan lokasi.</small>
                             </div>
@@ -217,6 +222,43 @@
                         console.warn("Geolocation error:", error);
                     });
                 }
+            }
+
+            // Handle "Gunakan Lokasi Saya" button
+            const useLocationBtn = document.getElementById('useCurrentLocation');
+            if (useLocationBtn) {
+                useLocationBtn.addEventListener('click', function() {
+                    if (navigator.geolocation) {
+                        locationStatus.textContent = 'Mendapatkan lokasi...';
+                        locationStatus.className = 'form-text mt-1 mb-3 text-info';
+                        
+                        navigator.geolocation.getCurrentPosition(function(position) {
+                            const lat = position.coords.latitude;
+                            const lng = position.coords.longitude;
+                            
+                            updateInputs(lat, lng);
+                            const newLatLng = new L.LatLng(lat, lng);
+                            marker.setLatLng(newLatLng);
+                            circle.setLatLng(newLatLng);
+                            map.setView(newLatLng, 18);
+                            
+                            locationStatus.textContent = 'Lokasi berhasil diperbarui ke posisi Anda saat ini.';
+                            locationStatus.className = 'form-text mt-1 mb-3 text-success';
+                        }, function(error) {
+                            let msg = 'Gagal mendapatkan lokasi.';
+                            switch(error.code) {
+                                case error.PERMISSION_DENIED: msg = "Izin lokasi ditolak."; break;
+                                case error.POSITION_UNAVAILABLE: msg = "Informasi lokasi tidak tersedia."; break;
+                                case error.TIMEOUT: msg = "Waktu permintaan habis."; break;
+                            }
+                            locationStatus.textContent = msg;
+                            locationStatus.className = 'form-text mt-1 mb-3 text-danger';
+                        });
+                    } else {
+                        locationStatus.textContent = 'Browser tidak mendukung geolocation.';
+                        locationStatus.className = 'form-text mt-1 mb-3 text-danger';
+                    }
+                });
             }
         });
     </script>

@@ -530,5 +530,27 @@
             })();
         @endif
 
+        // --- Preload AI Models for Faster Camera Access ---
+        window.addEventListener('load', () => {
+            // Delay slightly to ensure dashboard interactivity first
+            setTimeout(() => {
+                const modelsToPreload = [
+                    '/models/mtcnn_model-shard1',
+                    '/models/mtcnn_model-weights_manifest.json',
+                    '/models/face_landmark_68_model-shard1',
+                    '/models/face_landmark_68_model-weights_manifest.json',
+                    '/models/face_recognition_model-shard1',
+                    '/models/face_recognition_model-shard2',
+                    '/models/face_recognition_model-weights_manifest.json'
+                ];
+
+                modelsToPreload.forEach(url => {
+                    fetch(url, { cache: "force-cache" })
+                        .then(() => console.log(`[Preload] Cached: ${url}`))
+                        .catch(err => console.warn(`[Preload] Failed: ${url}`, err));
+                });
+            }, 2000); // Start 2 seconds after load
+        });
+
     </script>
 @endsection

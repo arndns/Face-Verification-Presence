@@ -415,9 +415,10 @@
         async function init() {
             await ensureFaceAPI(); // 1. Muat library Face-API
 
+            // Tampilkan loading, tapi biarkan kamera mulai
             Swal.fire({
-                title: 'Memuat Kamera',
-                text: 'Menyiapkan model verifikasi dan mengakses kamera Anda...',
+                title: 'Memuat Sistem',
+                text: 'Menyiapkan kamera dan model kecerdasan buatan...',
                 allowOutsideClick: false,
                 showConfirmButton: false,
                 didOpen: () => {
@@ -426,15 +427,16 @@
             });
 
             try {
+                // Jalan paralel: Start Camera + Load Models + Get Embeddings
+                const cameraPromise = startCamera(); 
+                const modelsPromise = loadFaceModels();
+                const embeddingPromise = getReferenceEmbedding();
 
-                await loadFaceModels();
-                await getReferenceEmbedding();
+                // Tunggu semua selesai
+                await Promise.all([cameraPromise, modelsPromise, embeddingPromise]);
 
-
-                Swal.update({
-                    text: 'Mengakses kamera...'
-                });
-                await startCamera();
+                Swal.close(); // Tutup loading saat semua siap
+                
             } catch (error) {
                 Swal.fire({
                     icon: 'error',
@@ -449,7 +451,7 @@
             if (window.faceapi) return Promise.resolve();
             return new Promise((ok, err) => {
                 const s = document.createElement("script");
-                s.src = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+                s.src = "{{ asset('assets/js/face-api.min.js') }}";
                 s.onload = ok;
                 s.onerror = err;
                 document.head.appendChild(s);
@@ -458,9 +460,12 @@
 
         async function loadFaceModels() {
             const MODEL_URL = '/models';
-            await faceapi.nets.mtcnn.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+            // Load models in parallel for speed
+            await Promise.all([
+                faceapi.nets.mtcnn.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+            ]);
         }
 
         async function getReferenceEmbedding() {
@@ -670,7 +675,7 @@
 
             Webcam.on("live", () => {
                 console.log('Kamera live');
-                Swal.close();
+                // Swal.close(); // Jangan close dulu, tunggu model siap di init()
                 const video = wrap.querySelector("video");
                 if (!video) {
                     console.error('Element video tidak ditemukan');
@@ -1217,6 +1222,10 @@
                     allowOutsideClick: false,
                     showConfirmButton: true,
                     confirmButtonText: 'Ok'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = "{{ route('employee.index') }}";
+                    }
                 });
                 if (actionType === 'clock_out') {
                     presenceState.hasCheckedIn = true;
