@@ -23,11 +23,3 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-
-# Local portable PHP & Composer
-/bin
-/php.bat
-/composer.bat
-/setup_portable.ps1
-/node.bat
-/npm.bat
