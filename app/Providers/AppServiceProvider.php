@@ -29,5 +29,7 @@ class AppServiceProvider extends ServiceProvider
         if (!$this->app->runningInConsole()) {
             URL::forceRootUrl(request()->getSchemeAndHttpHost());
         }
+        
+        \Carbon\Carbon::setLocale(config('app.locale'));
     }
 }

@@ -5,10 +5,10 @@
     $employeeProfile = $employee;
     $todayStatus = $todayPresence
         ? ($todayPresence->waktu_pulang ? 'Presensi Selesai' : 'Presensi Berjalan')
-        : 'Belum Presensi';
+        : ($approvedPermitToday ? 'Sedang Izin/Cuti' : 'Belum Presensi');
     $todayIn = optional($todayPresence?->waktu_masuk)->format('H:i') ?? '--:--';
     $todayOut = optional($todayPresence?->waktu_pulang)->format('H:i') ?? '--:--';
-    $lastPresence = $recentPresences->first();
+    $lastPresence = $recentPresences->first(fn($p) => !($p->is_permit ?? false));
     $presencesWithDate = $recentPresences->filter(fn($presence) => $presence->waktu_masuk || $presence->waktu_pulang);
     $groupedPresences = $presencesWithDate->groupBy(function ($presence) {
         $date = $presence->waktu_masuk ?? $presence->waktu_pulang;
@@ -95,19 +95,35 @@
 
         <div class="action-strip card shadow-sm border-0 rounded-4 cta-card p-4">
             <div class="w-100">
-                <a href="{{ route('employee.camera') }}" class="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
-                        <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
-                        <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
-                        <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
-                        <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
-                        <path d="M9 10v2"></path>
-                        <path d="M15 10v2"></path>
-                        <path d="M12 14c-1 0-1.5.5-1.5 1s.5 1 1.5 1 1.5-.5 1.5-1-.5-1-1.5-1z"></path> <!-- Nose approximation -->
-                        <path d="M9 17c1.5 1 4.5 1 6 0"></path>
-                    </svg>
-                    Mulai Presensi
-                </a>
+                @if($approvedPermitToday)
+                    <button class="btn btn-secondary btn-lg w-100 d-flex align-items-center justify-content-center" disabled>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                            <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+                            <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+                            <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+                            <path d="M9 10v2"></path>
+                            <path d="M15 10v2"></path>
+                            <path d="M12 14c-1 0-1.5.5-1.5 1s.5 1 1.5 1 1.5-.5 1.5-1-.5-1-1.5-1z"></path> <!-- Nose approximation -->
+                            <path d="M9 17c1.5 1 4.5 1 6 0"></path>
+                        </svg>
+                        Sedang Izin/Cuti
+                    </button>
+                @else
+                    <a href="{{ route('employee.camera') }}" class="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center" id="main-presence-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                            <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+                            <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+                            <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+                            <path d="M9 10v2"></path>
+                            <path d="M15 10v2"></path>
+                            <path d="M12 14c-1 0-1.5.5-1.5 1s.5 1 1.5 1 1.5-.5 1.5-1-.5-1-1.5-1z"></path> <!-- Nose approximation -->
+                            <path d="M9 17c1.5 1 4.5 1 6 0"></path>
+                        </svg>
+                        <span class="btn-text">Mulai Presensi</span>
+                    </a>
+                @endif
             </div>
         </div>
 
@@ -178,8 +194,16 @@
                                     @foreach ($rows as $presence)
                                         <tr>
                                             <td class="py-3">{{ optional($presence->waktu_masuk ?? $presence->waktu_pulang)->translatedFormat('d M Y') ?? '-' }}</td>
-                                            <td class="text-center py-3">{{ optional($presence->waktu_masuk)->format('H:i') ?? '-' }}</td>
-                                            <td class="text-center py-3">{{ optional($presence->waktu_pulang)->format('H:i') ?? '-' }}</td>
+                                            @if($presence->is_permit ?? false)
+                                                <td class="text-center py-3" colspan="2">
+                                                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-3 py-2 rounded-pill">
+                                                        {{ $presence->permit_type }}
+                                                    </span>
+                                                </td>
+                                            @else
+                                                <td class="text-center py-3">{{ optional($presence->waktu_masuk)->format('H:i') ?? '-' }}</td>
+                                                <td class="text-center py-3">{{ optional($presence->waktu_pulang)->format('H:i') ?? '-' }}</td>
+                                            @endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -313,6 +337,10 @@
             }
 
             function checkLocation() {
+                const mainBtn = document.getElementById('main-presence-btn');
+                const bottomBtn = document.getElementById('bottom-nav-presence');
+                const cameraRoute = "{{ route('employee.camera') }}";
+
                 if (!navigator.geolocation) {
                     statusText.textContent = 'Browser Anda tidak mendukung geolocation.';
                     statusText.classList.add('text-danger-bold');
@@ -330,12 +358,48 @@
                     const distance = calculateDistance(latitude, longitude, officeLat, officeLon);
 
                     statusText.textContent = `Posisi Anda ${distance.toFixed(0)} m dari kantor.`;
-                    if (distance <= officeRadius) {
+                    
+                    const isInside = distance <= officeRadius;
+
+                    if (isInside) {
                         statusText.classList.add('text-success-bold');
                         statusText.classList.remove('text-danger-bold');
+                        
+                        // Enable buttons
+                        if (mainBtn) {
+                            mainBtn.classList.remove('disabled', 'btn-secondary');
+                            mainBtn.classList.add('btn-primary');
+                            mainBtn.style.opacity = '1';
+                            mainBtn.style.cursor = 'pointer';
+                            mainBtn.href = cameraRoute;
+                            mainBtn.querySelector('.btn-text').textContent = 'Mulai Presensi';
+                        }
+                        if (bottomBtn) {
+                            bottomBtn.style.opacity = '1';
+                            bottomBtn.style.cursor = 'pointer';
+                            bottomBtn.style.pointerEvents = 'auto';
+                            bottomBtn.href = cameraRoute;
+                        }
+
                     } else {
                         statusText.classList.add('text-danger-bold');
                         statusText.classList.remove('text-success-bold');
+                        
+                        // Disable buttons
+                        if (mainBtn) {
+                            mainBtn.classList.add('disabled', 'btn-secondary');
+                            mainBtn.classList.remove('btn-primary');
+                            mainBtn.style.opacity = '0.6';
+                            mainBtn.style.cursor = 'not-allowed';
+                            mainBtn.removeAttribute('href');
+                            mainBtn.querySelector('.btn-text').textContent = 'Di Luar Jangkauan';
+                        }
+                        if (bottomBtn) {
+                            bottomBtn.style.opacity = '0.5';
+                            bottomBtn.style.cursor = 'not-allowed';
+                            bottomBtn.style.pointerEvents = 'none'; // Prevent clicks
+                            bottomBtn.removeAttribute('href');
+                        }
                     }
 
                     // Show and initialize map

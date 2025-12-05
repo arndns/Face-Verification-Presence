@@ -23,7 +23,12 @@ if errorlevel 1 (
 echo.
 echo ==========================================
 echo   Server Starting...
-echo   Open: http://192.168.0.85:8000 (or http://<LAN-IP>:8000)
+:: Auto-detect IP Address
+set IP_ADDR=localhost
+for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr "IPv4"') do set IP_ADDR=%%a
+set IP_ADDR=%IP_ADDR: =%
+
+echo   Open: http://%IP_ADDR%:8000
 echo   (Press Ctrl+C to stop)
 echo ==========================================
 .\php.bat artisan serve --host 0.0.0.0 --port 8000

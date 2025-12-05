@@ -47,9 +47,9 @@
                                 </h6>
                                 <small class="text-muted">
                                     <i class="fas fa-calendar"></i>
-                                    {{ \Carbon\Carbon::parse($permit->start_date)->format('d M Y') }}
+                                    {{ \Carbon\Carbon::parse($permit->start_date)->translatedFormat('d M Y') }}
                                     - 
-                                    {{ \Carbon\Carbon::parse($permit->end_date)->format('d M Y') }}
+                                    {{ \Carbon\Carbon::parse($permit->end_date)->translatedFormat('d M Y') }}
                                     ({{ \Carbon\Carbon::parse($permit->start_date)->diffInDays($permit->end_date) + 1 }} hari)
                                 </small>
                             </div>

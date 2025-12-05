@@ -42,6 +42,13 @@
                             <!-- Status Lokasi dari GPS -->
                             <div id="locationStatus" class="form-text mt-1 mb-3"></div>
 
+                            <!-- Peta Lokasi -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold"><i class="fas fa-map-marked-alt me-2 text-primary"></i>Pilih Lokasi di Peta</label>
+                                <div id="map" style="height: 400px; width: 100%; border-radius: 8px; border: 1px solid #ced4da;"></div>
+                                <small class="text-muted">Geser marker atau klik pada peta untuk menentukan lokasi.</small>
+                            </div>
+
                             <div class="row">
                                 <!-- Field Latitude -->
                                 <div class="col-md-6 mb-3">
@@ -94,50 +101,124 @@
         </div>
     </div>
     <script>
-        const latitudeInput = document.getElementById('latitude');
-        const longitudeInput = document.getElementById('longitude');
+        // Script untuk Geolocation dasar (hanya mengisi jika kosong dan diminta)
         const locationStatus = document.getElementById('locationStatus');
+        
+        // Hapus event listener window load yang lama agar tidak konflik dengan map
+        // window.addEventListener('load', ...); 
+    </script>
+@endsection
 
-        // Fungsi ini akan dipanggil saat halaman dimuat
-        window.addEventListener('load', () => {
-            if (navigator.geolocation) {
-                locationStatus.textContent = 'Mendapatkan lokasi...';
-                locationStatus.classList.remove('text-danger', 'text-success');
-                navigator.geolocation.getCurrentPosition(showPosition, showError);
-            } else {
-                locationStatus.textContent = 'Geolocation tidak didukung oleh browser ini.';
-                locationStatus.classList.add('text-danger');
+@section('style')
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+@endsection
+
+@section('script')
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const latInput = document.getElementById('latitude');
+            const lngInput = document.getElementById('longitude');
+            const radiusInput = document.getElementById('radius');
+            
+            // Default location (Jakarta) if no data
+            let defaultLat = -6.2088;
+            let defaultLng = 106.8456;
+            let zoomLevel = 13;
+
+            // Check if inputs have values
+            if (latInput.value && lngInput.value) {
+                defaultLat = parseFloat(latInput.value);
+                defaultLng = parseFloat(lngInput.value);
+                zoomLevel = 16;
+            }
+
+            // Initialize Map
+            const map = L.map('map').setView([defaultLat, defaultLng], zoomLevel);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Marker
+            let marker = L.marker([defaultLat, defaultLng], {
+                draggable: true
+            }).addTo(map);
+
+            // Circle for radius
+            let circle = L.circle([defaultLat, defaultLng], {
+                color: 'blue',
+                fillColor: '#3085d6',
+                fillOpacity: 0.1,
+                radius: parseFloat(radiusInput.value) || 0
+            }).addTo(map);
+
+            // Update inputs when marker is dragged
+            marker.on('dragend', function(e) {
+                const position = marker.getLatLng();
+                updateInputs(position.lat, position.lng);
+                updateCircle(position.lat, position.lng);
+            });
+
+            // Update marker when map is clicked
+            map.on('click', function(e) {
+                const position = e.latlng;
+                marker.setLatLng(position);
+                updateInputs(position.lat, position.lng);
+                updateCircle(position.lat, position.lng);
+            });
+
+            // Update marker when inputs change manually
+            latInput.addEventListener('change', updateMarkerFromInputs);
+            lngInput.addEventListener('change', updateMarkerFromInputs);
+            radiusInput.addEventListener('input', function() {
+                const r = parseFloat(this.value) || 0;
+                circle.setRadius(r);
+            });
+
+            function updateInputs(lat, lng) {
+                latInput.value = lat;
+                lngInput.value = lng;
+            }
+
+            function updateCircle(lat, lng) {
+                circle.setLatLng([lat, lng]);
+            }
+
+            function updateMarkerFromInputs() {
+                const lat = parseFloat(latInput.value);
+                const lng = parseFloat(lngInput.value);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    const newLatLng = new L.LatLng(lat, lng);
+                    marker.setLatLng(newLatLng);
+                    circle.setLatLng(newLatLng);
+                    map.panTo(newLatLng);
+                }
+            }
+
+            // If inputs were empty, try to get current location
+            if (!latInput.value || !lngInput.value) {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(function(position) {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        
+                        // Only update if user hasn't input anything yet
+                        if (!latInput.value && !lngInput.value) {
+                            updateInputs(lat, lng);
+                            const newLatLng = new L.LatLng(lat, lng);
+                            marker.setLatLng(newLatLng);
+                            circle.setLatLng(newLatLng);
+                            map.setView(newLatLng, 16);
+                        }
+                    }, function(error) {
+                        console.warn("Geolocation error:", error);
+                    });
+                }
             }
         });
-
-        function showPosition(position) {
-            latitudeInput.value = position.coords.latitude;
-            longitudeInput.value = position.coords.longitude;
-            locationStatus.textContent = 'Lokasi berhasil didapatkan!';
-            locationStatus.classList.add('text-success');
-            locationStatus.classList.remove('text-danger');
-        }
-
-        function showError(error) {
-            let message = '';
-            switch (error.code) {
-                case error.PERMISSION_DENIED:
-                    message = "Perizinan Lokasi Bermasalah.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    message = "Informasi lokasi tidak tersedia.";
-                    break;
-                case error.TIMEOUT:
-                    message = "Permintaan untuk mendapatkan lokasi pengguna timeout.";
-                    break;
-                case error.UNKNOWN_ERROR:
-                    message = "Terjadi kesalahan yang tidak diketahui.";
-                    break;
-            }
-            locationStatus.textContent = message;
-            locationStatus.classList.add('text-danger');
-            locationStatus.classList.remove('text-success');
-        }
     </script>
 
 @endsection

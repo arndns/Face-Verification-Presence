@@ -69,24 +69,36 @@
                                         <td><strong>{{ $presence->nik }}</strong></td>
                                         <td>{{ $presence->nama }}</td>
                                         <td><span class="badge bg-info">{{ $presence->jabatan }}</span></td>
+                                        
+                                        {{-- Waktu Masuk --}}
                                         <td>
-                                            @if($presence->waktu_masuk)
+                                            @if($presence->type === 'presence' && $presence->waktu_masuk)
                                                 <i class="fas fa-clock text-success"></i>
-                                                {{ \Carbon\Carbon::parse($presence->waktu_masuk)->format('d/m/Y H:i') }}
+                                                {{ \Carbon\Carbon::parse($presence->waktu_masuk)->translatedFormat('d M Y H:i') }}
+                                            @elseif($presence->type === 'permit')
+                                                <span class="text-muted small">{{ \Carbon\Carbon::parse($presence->date)->translatedFormat('d M Y') }}</span>
                                             @else
                                                 <span class="text-muted">-</span>
                                             @endif
                                         </td>
+
+                                        {{-- Waktu Pulang --}}
                                         <td>
-                                            @if($presence->waktu_pulang)
+                                            @if($presence->type === 'presence' && $presence->waktu_pulang)
                                                 <i class="fas fa-clock text-danger"></i>
-                                                {{ \Carbon\Carbon::parse($presence->waktu_pulang)->format('d/m/Y H:i') }}
+                                                {{ \Carbon\Carbon::parse($presence->waktu_pulang)->translatedFormat('d M Y H:i') }}
+                                            @elseif($presence->type === 'permit')
+                                                <span class="text-muted">-</span>
                                             @else
                                                 <span class="text-muted">-</span>
                                             @endif
                                         </td>
+
+                                        {{-- Status --}}
                                         <td>
-                                            @if($presence->waktu_masuk && $presence->waktu_pulang)
+                                            @if($presence->type === 'permit')
+                                                <span class="badge bg-primary">{{ $presence->status }}</span>
+                                            @elseif($presence->waktu_masuk && $presence->waktu_pulang)
                                                 <span class="badge bg-success">Selesai</span>
                                             @elseif($presence->waktu_masuk)
                                                 <span class="badge bg-warning">Sedang Berlangsung</span>

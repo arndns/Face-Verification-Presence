@@ -21,6 +21,27 @@ use Carbon\CarbonPeriod;
 
 class EmployeeController extends Controller
 {
+    protected $approvedPermitToday;
+
+    public function __construct()
+    {
+        $this->middleware(function ($request, $next) {
+            $user = Auth::user();
+            $employee = $user?->employee;
+            $this->approvedPermitToday = null;
+
+            if ($employee) {
+                $timezone = optional($employee->location)->timezone ?? config('app.timezone');
+                $now = now($timezone);
+                $this->approvedPermitToday = $this->findApprovedPermitForDate($employee, $now);
+            }
+
+            view()->share('approvedPermitToday', $this->approvedPermitToday);
+
+            return $next($request);
+        });
+    }
+
     public function index(): View
     {
         $user = User::with([
@@ -42,8 +63,46 @@ class EmployeeController extends Controller
 
             $recentPresences = $employee->presence()
                 ->latest('waktu_masuk')
-                ->limit(5)
+                ->limit(20)
+                ->get()
+                ->map(function ($item) {
+                    $item->is_permit = false;
+                    return $item;
+                });
+
+            $recentPermits = Permit::where('employee_id', $employee->id)
+                ->where('status', 'approved')
+                ->where('end_date', '>=', now()->subDays(60)->toDateString())
                 ->get();
+
+            $history = $recentPresences;
+
+            foreach ($recentPermits as $permit) {
+                $period = CarbonPeriod::create($permit->start_date, $permit->end_date);
+                foreach ($period as $date) {
+                    if ($date->gt(now())) continue;
+
+                    // Check if this date already exists in presence to avoid duplicates if desired
+                    // For now we allow both, or we could filter. 
+                    // Let's check if we have a presence for this date
+                    $hasPresence = $recentPresences->contains(function ($p) use ($date) {
+                        return $p->waktu_masuk && $p->waktu_masuk->isSameDay($date);
+                    });
+
+                    if (!$hasPresence) {
+                        $obj = new \stdClass();
+                        $obj->waktu_masuk = $date->copy()->setTime(0, 0, 0);
+                        $obj->waktu_pulang = null;
+                        $obj->is_permit = true;
+                        $obj->permit_type = $this->formatLeaveTypeLabel($permit->leave_type);
+                        $history->push($obj);
+                    }
+                }
+            }
+
+            $recentPresences = $history->sortByDesc(function ($item) {
+                return $item->waktu_masuk ?? $item->waktu_pulang;
+            })->values()->take(20);
         }
 
         $faceRegistered = $employee ? $employee->faceEmbeddings()->exists() : false;
@@ -58,10 +117,11 @@ class EmployeeController extends Controller
             $timezone = optional($employee->location)->timezone ?? config('app.timezone');
             $now = now($timezone);
             $shift = $this->resolveEmployeeShift($employee);
+            $approvedPermitToday = $this->findApprovedPermitForDate($employee, $now);
 
             if ($shift) {
                 $shiftStart = $this->resolveShiftDateTime($shift->jam_masuk, $now, $timezone);
-                if (!$todayPresence && $shiftStart) {
+                if (!$todayPresence && $shiftStart && !$approvedPermitToday) {
                     $shouldShowPresenceReminder = $now->greaterThanOrEqualTo($shiftStart);
                 }
             }
@@ -81,6 +141,7 @@ class EmployeeController extends Controller
                 'current_time' => $now?->format('H:i'),
                 'timezone' => $timezone,
             ],
+            'approvedPermitToday' => $approvedPermitToday,
         ]);
     }
 
@@ -190,9 +251,9 @@ class EmployeeController extends Controller
             }
 
             if ($todayPresence) {
-                if ($todayPresence->waktu_pulang) {
-                    return response()->json(['error' => 'Anda sudah menyelesaikan presensi hari ini'], 400);
-                }
+                // if ($todayPresence->waktu_pulang) {
+                //     return response()->json(['error' => 'Anda sudah menyelesaikan presensi hari ini'], 400);
+                // }
 
                 if ($shiftEnd && $now->lessThan($shiftEnd)) {
                     return response()->json(['error' => 'Belum waktunya melakukan presensi pulang'], 400);
@@ -320,7 +381,7 @@ class EmployeeController extends Controller
 
         $hasCheckedIn = (bool) $todayPresence;
         $hasCheckedOut = $hasCheckedIn && (bool) $todayPresence?->waktu_pulang;
-        $canCheckOut = $hasCheckedIn && !$hasCheckedOut && $shiftEnd && $now->greaterThanOrEqualTo($shiftEnd);
+        $canCheckOut = $hasCheckedIn && $shiftEnd && $now->greaterThanOrEqualTo($shiftEnd);
 
         $shouldRemindCheckIn = !$hasCheckedIn && $shiftStart && $now->greaterThanOrEqualTo($shiftStart);
         $shouldRemindCheckOut = !$hasCheckedOut && $shiftEnd && $now->greaterThanOrEqualTo($shiftEnd);

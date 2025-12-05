@@ -28,29 +28,13 @@
                         Kamera...</span>
                 </div>
             </div>
-            <div class="w-100 mb-3">
-                <button id="takeattandance"
-                    class="w-100 btn btn-primary btn-lg fw-bold rounded-3 shadow d-flex align-items-center justify-content-center gap-3"
-                    data-user-id="{{ $user->employee->id }}" disabled> <i class="fa-solid fa-camera fa-lg"></i>
-                    <span id="button-text">Wajah Tidak Terdeteksi</span>
-                </button>
-            </div>
-            <div class="w-100 mb-2">
-                <div id="locationAlertWrapper"
-                    class="alert alert-secondary small mb-2 d-flex align-items-start justify-content-between gap-2 py-2" role="alert">
-                    <div id="locationValidationStatusText" class="small">
-                        @if ($employeeLocationInfo)
-                            Menunggu pembacaan lokasi perangkat...
-                        @else
-                            Lokasi presensi belum ditetapkan. Hubungi admin untuk bantuan.
-                        @endif
-                    </div>
-                    <button type="button" class="btn btn-sm btn-light text-muted px-2 py-0"
-                        aria-label="Tutup notifikasi" onclick="dismissLocationAlert()">
-                        &times;
-                    </button>
+            
+            <div class="w-100 mb-3 text-center">
+                <div id="status-indicator" class="p-3 rounded-3 shadow-sm bg-white border">
+                    <div class="spinner-border text-primary mb-2 d-none" role="status" id="loading-spinner"></div>
+                    <h5 id="status-title" class="mb-1 fw-bold text-dark">Menunggu Wajah...</h5>
+                    <p id="status-message" class="mb-0 text-muted small">Posisikan wajah Anda di dalam bingkai.</p>
                 </div>
-                <div id="map" style="height: 200px; border-radius: 8px;"></div>
             </div>
         </div>
     </div>
@@ -71,15 +55,7 @@
             margin: 0 auto;
         }
 
-        #map {
-            height: 200px;
-            margin-bottom: 10px;
-            position: relative;
-            z-index: 1;
-            border-radius: 8px;
-            overflow: hidden;
-            width: 100%;
-        }
+
 
         .camera-page {
             padding-bottom: 90px;
@@ -106,6 +82,7 @@
         const STATUS_POLL_INTERVAL_MS = 60000;
         let referenceEmbeddings = []; // Diisi saat init() dari API (multi-orientasi)
         let isVerifying = false;
+        let recentSuccess = false;
         const presenceState = {
             hasCheckedIn: false,
             hasCheckedOut: false,
@@ -136,13 +113,7 @@
             isInsideRadius: false,
             distanceMeters: null,
         };
-        let mapInstance = null;
-        const mapLayers = {
-            userMarker: null,
-            userCircle: null,
-            officeMarker: null,
-            allowedCircle: null,
-        };
+        // Map variables removed
         let locationNotConfiguredModalShown = false;
         let outsideRadiusModalShown = false;
         let missingLocationModalShown = false;
@@ -179,13 +150,11 @@
                 const insecureMessage =
                     'Browser memblokir geolokasi karena halaman tidak diakses via HTTPS/localhost. Buka lewat https atau localhost agar izin lokasi muncul.';
                 updateLocationAlert(insecureMessage, 'warning');
-                renderFallbackOfficeMap();
                 return;
             }
 
             if (!navigator.geolocation) {
                 updateLocationAlert('Perangkat Anda tidak mendukung geolocation.', 'danger');
-                renderFallbackOfficeMap();
                 return;
             }
 
@@ -204,10 +173,6 @@
 
             missingLocationModalShown = false;
 
-            const mapCenterLat = EMPLOYEE_LOCATION?.latitude ?? geoState.latitude;
-            const mapCenterLng = EMPLOYEE_LOCATION?.longitude ?? geoState.longitude;
-            ensureMapInstance(mapCenterLat, mapCenterLng);
-            updateMapLayers(geoState.latitude, geoState.longitude);
             validateEmployeeLocation();
             updateLocationAlert();
         }
@@ -244,8 +209,7 @@
 
             updateLocationAlert(message, 'danger');
             showLocationRequirementModal(message);
-            applyButtonIdleState();
-            renderFallbackOfficeMap();
+            updateStatusIndicator('Lokasi Error', message, 'danger');
         }
 
  
@@ -261,14 +225,7 @@
                 updateLocationAlert();
             }
 
-            renderFallbackOfficeMap();
             initializeGeolocation();
-
-            const attendanceButton = document.getElementById('takeattandance');
-            if (!attendanceButton) {
-                console.log("Mode absensi tidak aktif.");
-                return;
-            }
 
             monitorPresenceStatus({ showReminders: true });
             if (!presenceStatusInterval) {
@@ -282,113 +239,7 @@
             init();
         });
 
-        function renderFallbackOfficeMap() {
-            const hasOfficeLocation = Boolean(
-                EMPLOYEE_LOCATION && EMPLOYEE_LOCATION.latitude !== null && EMPLOYEE_LOCATION.longitude !== null
-            );
-            const fallbackLat = hasOfficeLocation ? Number(EMPLOYEE_LOCATION.latitude) : 0;
-            const fallbackLng = hasOfficeLocation ? Number(EMPLOYEE_LOCATION.longitude) : 0;
 
-            ensureMapInstance(fallbackLat, fallbackLng);
-
-            if (!mapInstance || !hasOfficeLocation) {
-                return;
-            }
-
-            const officeLatLng = [fallbackLat, fallbackLng];
-            if (!mapLayers.officeMarker) {
-                mapLayers.officeMarker = L.marker(officeLatLng, {
-                    title: `Lokasi Kantor (${EMPLOYEE_LOCATION.kota || '-'})`
-                }).addTo(mapInstance);
-            } else {
-                mapLayers.officeMarker.setLatLng(officeLatLng);
-            }
-
-            if (!mapLayers.allowedCircle) {
-                mapLayers.allowedCircle = L.circle(officeLatLng, {
-                    color: '#2563eb',
-                    fillColor: '#3b82f6',
-                    fillOpacity: 0.08,
-                    radius: Number(EMPLOYEE_LOCATION.radius || 0),
-                    dashArray: '4 8'
-                }).addTo(mapInstance);
-            } else {
-                mapLayers.allowedCircle.setLatLng(officeLatLng);
-                mapLayers.allowedCircle.setRadius(Number(EMPLOYEE_LOCATION.radius || 0));
-            }
-
-            mapInstance.setView(officeLatLng, 15);
-        }
-
-        function ensureMapInstance(lat, lng) {
-            if (mapInstance) {
-                return mapInstance;
-            }
-
-            mapInstance = L.map('map').setView([lat, lng], 15);
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(mapInstance);
-
-            return mapInstance;
-        }
-
-        function updateMapLayers(userLat, userLng) {
-            if (!mapInstance) {
-                return;
-            }
-
-            const userLatLng = [userLat, userLng];
-            if (!mapLayers.userMarker) {
-                mapLayers.userMarker = L.marker(userLatLng, {
-                    title: 'Lokasi Anda'
-                }).addTo(mapInstance);
-            } else {
-                mapLayers.userMarker.setLatLng(userLatLng);
-            }
-
-            const accuracyRadius = Math.max(geoState.accuracy || 20, 20);
-            if (!mapLayers.userCircle) {
-                mapLayers.userCircle = L.circle(userLatLng, {
-                    color: '#16a34a',
-                    fillColor: '#16a34a',
-                    fillOpacity: 0.2,
-                    radius: accuracyRadius
-                }).addTo(mapInstance);
-            } else {
-                mapLayers.userCircle.setLatLng(userLatLng);
-                mapLayers.userCircle.setRadius(accuracyRadius);
-            }
-
-            if (EMPLOYEE_LOCATION && EMPLOYEE_LOCATION.latitude !== null && EMPLOYEE_LOCATION.longitude !== null) {
-                const officeLatLng = [Number(EMPLOYEE_LOCATION.latitude), Number(EMPLOYEE_LOCATION.longitude)];
-                if (!mapLayers.officeMarker) {
-                    mapLayers.officeMarker = L.marker(officeLatLng, {
-                        title: `Lokasi Kantor (${EMPLOYEE_LOCATION.kota || '-'})`
-                    }).addTo(mapInstance);
-                } else {
-                    mapLayers.officeMarker.setLatLng(officeLatLng);
-                }
-
-                if (!mapLayers.allowedCircle) {
-                    mapLayers.allowedCircle = L.circle(officeLatLng, {
-                        color: '#2563eb',
-                        fillColor: '#3b82f6',
-                        fillOpacity: 0.08,
-                        radius: Number(EMPLOYEE_LOCATION.radius || 0),
-                        dashArray: '4 8'
-                    }).addTo(mapInstance);
-                } else {
-                    mapLayers.allowedCircle.setLatLng(officeLatLng);
-                    mapLayers.allowedCircle.setRadius(Number(EMPLOYEE_LOCATION.radius || 0));
-                }
-
-                const bounds = L.latLngBounds(userLatLng, officeLatLng);
-                mapInstance.fitBounds(bounds.pad(0.4));
-            } else {
-                mapInstance.setView(userLatLng, mapInstance.getZoom());
-            }
-        }
 
         function validateEmployeeLocation() {
             if (!EMPLOYEE_LOCATION) {
@@ -435,7 +286,7 @@
                 outsideRadiusModalShown = false;
             }
 
-            applyButtonIdleState();
+            updateStatusIndicatorForLocation();
         }
 
         function updateLocationAlert(message = null, status = 'info') {
@@ -842,9 +693,6 @@
                         once: true
                     });
                 }
-
-
-                setupAttendanceButton('takeattandance', video);
             });
 
             Webcam.on("error", (err) => {
@@ -862,13 +710,28 @@
                 minFaceSize: 100
             });
             const dpr = window.devicePixelRatio || 1;
-            const attendanceButton = document.getElementById('takeattandance');
-            const buttonText = document.getElementById('button-text');
+            const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
+            const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
 
             async function loop() {
-                if (video.readyState < 2 || isVerifying || !referenceEmbeddings.length) {
+                if (video.readyState < 2 || isVerifying || !referenceEmbeddings.length || recentSuccess) {
                     requestAnimationFrame(loop);
                     return;
+                }
+
+                // Cek status presensi sebelum melakukan deteksi
+                const actionMode = getCurrentActionMode();
+                if (actionMode === 'on_leave' || actionMode === 'done' || actionMode === 'waiting') {
+                     updateStatusIndicatorForActionMode(actionMode);
+                     requestAnimationFrame(loop);
+                     return;
+                }
+
+                // Cek lokasi
+                if (!EMPLOYEE_LOCATION || !locationValidation.ready || !locationValidation.isInsideRadius) {
+                     updateStatusIndicatorForLocation();
+                     requestAnimationFrame(loop);
+                     return;
                 }
 
                 const drawSize = {
@@ -877,7 +740,6 @@
                 };
 
                 try {
-                    // Hanya deteksi (cepat), tidak perlu landmark/descriptor di loop ini
                     const detections = await faceapi
                         .detectAllFaces(video, opts)
                         .withFaceLandmarks()
@@ -891,6 +753,7 @@
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.font = '12px "Inter", sans-serif';
                     let recognizedFaces = 0;
+                    
                     resizedResults.forEach((result) => {
                         const box = result.detection.box;
                         const drawX = box.x;
@@ -901,11 +764,13 @@
                         ctx.stroke();
 
                         let label = 'Tidak dikenali';
+                        let isMatch = false;
                         if (result.descriptor && referenceEmbeddings.length) {
                             const bestMatch = findBestReferenceDistance(result.descriptor);
                             if (bestMatch.distance < FACE_VERIFICATION_THRESHOLD) {
                                 label = displayName;
                                 recognizedFaces++;
+                                isMatch = true;
                             }
                         }
 
@@ -918,8 +783,8 @@
                         const rectY = box.y - textHeight - padding;
                         const textY = box.y - 6;
 
-                        ctx.fillStyle = 'rgba(14, 165, 233, 0.8)';
-                        ctx.strokeStyle = '#38bdf8';
+                        ctx.fillStyle = isMatch ? 'rgba(14, 165, 233, 0.8)' : 'rgba(239, 68, 68, 0.8)';
+                        ctx.strokeStyle = isMatch ? '#38bdf8' : '#ef4444';
 
                         ctx.save();
                         if (VIDEO_MIRRORED) {
@@ -935,34 +800,16 @@
                         ctx.restore();
                     });
 
-                    if (attendanceButton && buttonText) {
-                        const actionMode = getCurrentActionMode();
-                        if (actionMode === 'on_leave') {
-                            attendanceButton.disabled = true;
-                            const leaveType = presenceState.leaveInfo?.leaveType;
-                            const leaveText = leaveType ? (LEAVE_LABELS[leaveType] || leaveType) : 'Izin';
-                            buttonText.innerText = `Sedang ${leaveText}`;
-                        } else if (actionMode === 'done') {
-                            attendanceButton.disabled = true;
-                            buttonText.innerText = 'Presensi Hari Ini Selesai';
-                        } else if (actionMode === 'waiting') {
-                            attendanceButton.disabled = true;
-                            buttonText.innerText = 'Menunggu Jam Pulang';
-                        } else if (actionMode === 'check_out' || actionMode === 'check_in') {
-                            if (recognizedFaces === 1 && resizedResults.length === 1) {
-                                attendanceButton.disabled = false;
-                                buttonText.innerText = actionMode === 'check_out' ? 'Presensi Pulang' : 'Presensi Masuk';
-                            } else if (resizedResults.length > 1) {
-                                attendanceButton.disabled = true;
-                                buttonText.innerText = 'Terlalu Banyak Wajah';
-                            } else {
-                                attendanceButton.disabled = true;
-                                buttonText.innerText = 'Wajah Tidak Terdeteksi';
-                            }
-                        } else {
-                            attendanceButton.disabled = true;
-                        }
+                    // Logika Auto-Presensi
+                    if (recognizedFaces === 1 && resizedResults.length === 1) {
+                        updateStatusIndicator('Memverifikasi...', 'Tahan posisi wajah Anda...', 'primary', true);
+                        await performVerification(video, csrfToken);
+                    } else if (resizedResults.length > 1) {
+                        updateStatusIndicator('Terlalu Banyak Wajah', 'Pastikan hanya satu wajah di kamera.', 'warning');
+                    } else {
+                        updateStatusIndicator('Menunggu Wajah...', 'Posisikan wajah Anda di dalam bingkai.', 'secondary');
                     }
+
                 } catch (detectError) {
                     console.error('❌ Error saat deteksi wajah:', detectError);
                 }
@@ -970,6 +817,101 @@
                 requestAnimationFrame(loop);
             }
             loop();
+        }
+
+        async function performVerification(video, csrfToken) {
+            if (isVerifying) return;
+            isVerifying = true;
+
+            const mtcnnOptions = new faceapi.MtcnnOptions({ minFaceSize: 100 });
+
+            try {
+                const collectedDescriptors = [];
+                let attempt = 0;
+                
+                while (collectedDescriptors.length < VERIFICATION_SAMPLES && attempt < VERIFICATION_SAMPLES + 2) {
+                    const detection = await faceapi.detectSingleFace(video, mtcnnOptions)
+                        .withFaceLandmarks()
+                        .withFaceDescriptor();
+                    if (detection) {
+                        collectedDescriptors.push(detection.descriptor);
+                    }
+                    attempt++;
+                    await new Promise(resolve => setTimeout(resolve, FRAME_DELAY_MS));
+                }
+
+                if (!collectedDescriptors.length) {
+                    updateStatusIndicator('Gagal Verifikasi', 'Wajah tidak stabil. Coba lagi.', 'danger');
+                    isVerifying = false;
+                    return;
+                }
+
+                const distanceResults = collectedDescriptors.map(descriptor => findBestReferenceDistance(descriptor));
+                const distances = distanceResults.map(result => result.distance);
+                const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+                const matchCount = distances.filter(d => d < FACE_VERIFICATION_THRESHOLD).length;
+
+                if (matchCount >= REQUIRED_MATCHES && avgDistance < FACE_VERIFICATION_THRESHOLD + FACE_VERIFICATION_MARGIN) {
+                    updateStatusIndicator('Verifikasi Berhasil!', 'Mengirim data presensi...', 'success', true);
+                    const snapshotData = takeSnapshot(video);
+                    await sendPresenceRequest(csrfToken, snapshotData);
+                } else {
+                    updateStatusIndicator('Bukan Pemilik Akun', 'Wajah tidak cocok.', 'danger');
+                    await new Promise(r => setTimeout(r, 2000)); // Delay agar user bisa baca pesan error
+                    isVerifying = false;
+                }
+
+            } catch (err) {
+                console.error('Verification error:', err);
+                updateStatusIndicator('Error', 'Terjadi kesalahan verifikasi.', 'danger');
+                isVerifying = false;
+            }
+        }
+
+        function updateStatusIndicator(title, message, type = 'secondary', loading = false) {
+            const titleEl = document.getElementById('status-title');
+            const msgEl = document.getElementById('status-message');
+            const spinner = document.getElementById('loading-spinner');
+            const container = document.getElementById('status-indicator');
+
+            if (titleEl) titleEl.textContent = title;
+            if (msgEl) msgEl.textContent = message;
+            
+            if (spinner) {
+                if (loading) spinner.classList.remove('d-none');
+                else spinner.classList.add('d-none');
+            }
+
+            if (container) {
+                container.className = `p-3 rounded-3 shadow-sm border bg-white`;
+                // Bisa tambahkan border color based on type jika mau
+                if (type === 'danger') container.classList.add('border-danger');
+                else if (type === 'success') container.classList.add('border-success');
+                else if (type === 'warning') container.classList.add('border-warning');
+                else container.classList.remove('border-danger', 'border-success', 'border-warning');
+            }
+        }
+
+        function updateStatusIndicatorForActionMode(mode) {
+             if (mode === 'on_leave') {
+                 const leaveType = presenceState.leaveInfo?.leaveType;
+                 const leaveText = leaveType ? (LEAVE_LABELS[leaveType] || leaveType) : 'Izin';
+                 updateStatusIndicator(`Sedang ${leaveText}`, 'Anda tidak perlu presensi hari ini.', 'info');
+             } else if (mode === 'done') {
+                 updateStatusIndicator('Selesai', `Presensi hari ini sudah selesai (${presenceState.lastClockOut || '-'}).`, 'success');
+             } else if (mode === 'waiting') {
+                 updateStatusIndicator('Menunggu Jam Pulang', 'Belum waktunya presensi pulang.', 'warning');
+             }
+        }
+
+        function updateStatusIndicatorForLocation() {
+            if (!EMPLOYEE_LOCATION) {
+                updateStatusIndicator('Lokasi Belum Diatur', 'Hubungi admin.', 'danger');
+            } else if (!locationValidation.ready) {
+                updateStatusIndicator('Mencari Lokasi...', 'Menunggu koordinat GPS...', 'secondary', true);
+            } else if (!locationValidation.isInsideRadius) {
+                updateStatusIndicator('Di Luar Radius', 'Anda berada di luar jangkauan kantor.', 'danger');
+            }
         }
 
         function setupAttendanceButton(buttonId, videoTarget) {
@@ -1288,14 +1230,10 @@
                     presenceState.canCheckOut = false;
                     hasShownCheckInReminder = true;
                 }
-                const button = document.getElementById('takeattandance');
-                const buttonText = document.getElementById('button-text');
-                if (buttonText) {
-                    const timeText = recordedTime || '-';
-                    buttonText.innerText = `Berhasil! (${timeText})`;
-                }
+                updateStatusIndicator('Berhasil!', `Presensi tercatat (${recordedTime || '-'}).`, 'success');
+                recentSuccess = true;
+                setTimeout(() => { recentSuccess = false; }, 15000);
                 isVerifying = false;
-                applyButtonIdleState();
                 monitorPresenceStatus({
                     showReminders: false
                 });
@@ -1303,7 +1241,8 @@
             } catch (err) {
                 console.error('?? Terjadi kesalahan:', err);
                 Swal.fire('Error', err.message || 'Tidak dapat terhubung ke server.', 'error');
-                resetButton();
+                updateStatusIndicator('Error', 'Gagal mengirim data.', 'danger');
+                isVerifying = false; // Reset lock on error
                 monitorPresenceStatus({
                     showReminders: false
                 });
@@ -1311,11 +1250,7 @@
 
         }
 
-        function resetButton() {
-            console.log('🔄 Reset tombol ke status awal');
-            isVerifying = false;
-            applyButtonIdleState();
-        }
+
 
 
 
@@ -1361,8 +1296,6 @@
                 hasShownCheckoutReminder = true;
             }
 
-            applyButtonIdleState();
-
             if (showReminders) {
                 if (data.reminders?.should_check_in && !hasShownCheckInReminder) {
                     hasShownCheckInReminder = true;
@@ -1399,74 +1332,19 @@
             if (presenceState.isOnLeave) {
                 return 'on_leave';
             }
+            if (presenceState.canCheckOut) {
+                return 'check_out';
+            }
             if (presenceState.hasCheckedOut) {
                 return 'done';
             }
             if (!presenceState.hasCheckedIn) {
                 return 'check_in';
             }
-            if (presenceState.canCheckOut) {
-                return 'check_out';
-            }
             return 'waiting';
         }
 
-        function applyButtonIdleState() {
-            const button = document.getElementById('takeattandance');
-            const buttonText = document.getElementById('button-text');
-            const actionMode = getCurrentActionMode();
-            if (!button || !buttonText) {
-                return;
-            }
 
-            button.disabled = true;
-            button.classList.remove('btn-success', 'btn-warning', 'btn-primary', 'btn-secondary');
-
-            if (actionMode === 'on_leave') {
-                button.classList.add('btn-secondary');
-                const leaveType = presenceState.leaveInfo?.leaveType;
-                const leaveText = leaveType ? (LEAVE_LABELS[leaveType] || leaveType) : 'Izin';
-                buttonText.innerText = `Sedang ${leaveText}`;
-                return;
-            }
-
-            if (actionMode === 'done') {
-                button.classList.add('btn-success');
-                buttonText.innerText = `Sudah Presensi (${presenceState.lastClockOut || '-'})`;
-                return;
-            }
-
-            if (actionMode === 'waiting') {
-                button.classList.add('btn-warning');
-                buttonText.innerText = 'Menunggu Jam Pulang';
-                return;
-            }
-
-            if (!EMPLOYEE_LOCATION) {
-                button.classList.add('btn-secondary');
-                buttonText.innerText = 'Lokasi kantor belum ditetapkan';
-                return;
-            }
-
-            if (!locationValidation.ready) {
-                button.classList.add('btn-secondary');
-                buttonText.innerText = 'Menunggu lokasi perangkat';
-                return;
-            }
-
-            if (!locationValidation.isInsideRadius) {
-                button.classList.add('btn-secondary');
-                buttonText.innerText = 'Anda di luar radius lokasi';
-                return;
-            }
-
-            button.classList.add('btn-primary');
-            if (actionMode === 'check_out') {
-                buttonText.innerText = 'Presensi Pulang';
-            } else {
-                buttonText.innerText = 'Wajah Tidak Terdeteksi';
-            }
-        }
 
         function forceVideoFill(video) {
             video.setAttribute("playsinline", "");

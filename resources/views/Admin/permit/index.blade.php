@@ -71,8 +71,8 @@
                                         @endif
                                     </td>
                                     <td>
-                                        {{ \Carbon\Carbon::parse($permit->start_date)->format('d M Y') }} - 
-                                        {{ \Carbon\Carbon::parse($permit->end_date)->format('d M Y') }}
+                                        {{ \Carbon\Carbon::parse($permit->start_date)->translatedFormat('d M Y') }} - 
+                                        {{ \Carbon\Carbon::parse($permit->end_date)->translatedFormat('d M Y') }}
                                         <div class="text-muted small">
                                             ({{ \Carbon\Carbon::parse($permit->start_date)->diffInDays($permit->end_date) + 1 }} hari)
                                         </div>
@@ -155,7 +155,7 @@
                         <div class="mb-3">
                             <strong>Pegawai:</strong> {{ $permit->employee->nama }}<br>
                             <strong>Jenis:</strong> {{ ucfirst($permit->leave_type) }}<br>
-                            <strong>Periode:</strong> {{ \Carbon\Carbon::parse($permit->start_date)->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($permit->end_date)->format('d/m/Y') }}
+                            <strong>Periode:</strong> {{ \Carbon\Carbon::parse($permit->start_date)->translatedFormat('d M Y') }} - {{ \Carbon\Carbon::parse($permit->end_date)->translatedFormat('d M Y') }}
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Catatan Admin (Opsional)</label>
@@ -185,7 +185,7 @@
                         <div class="mb-3">
                             <strong>Pegawai:</strong> {{ $permit->employee->nama }}<br>
                             <strong>Jenis:</strong> {{ ucfirst($permit->leave_type) }}<br>
-                            <strong>Periode:</strong> {{ \Carbon\Carbon::parse($permit->start_date)->format('d/m/Y') }} - {{ \Carbon\Carbon::parse($permit->end_date)->format('d/m/Y') }}
+                            <strong>Periode:</strong> {{ \Carbon\Carbon::parse($permit->start_date)->translatedFormat('d M Y') }} - {{ \Carbon\Carbon::parse($permit->end_date)->translatedFormat('d M Y') }}
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Alasan Penolakan <span class="text-danger">*</span></label>
@@ -219,8 +219,8 @@
                         
                         <dt class="col-5">Tanggal:</dt>
                         <dd class="col-7">
-                            {{ \Carbon\Carbon::parse($permit->start_date)->format('d M Y') }} - 
-                            {{ \Carbon\Carbon::parse($permit->end_date)->format('d M Y') }}
+                            {{ \Carbon\Carbon::parse($permit->start_date)->translatedFormat('d M Y') }} - 
+                            {{ \Carbon\Carbon::parse($permit->end_date)->translatedFormat('d M Y') }}
                         </dd>
                         
                         <dt class="col-5">Alasan:</dt>

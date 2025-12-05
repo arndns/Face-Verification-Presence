@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
+use Carbon\CarbonPeriod;
+use Carbon\Carbon;
 
 class AdminController extends Controller
 {
@@ -195,35 +199,139 @@ class AdminController extends Controller
 
     public function presenceHistory(Request $request)
     {
-        $query = DB::table('presences')
+        // 1. Ambil Data Presensi (Hadir)
+        $presenceQuery = DB::table('presences')
             ->join('employees', 'presences.employee_id', '=', 'employees.id')
             ->select(
-                'presences.*',
+                'presences.id',
+                'presences.employee_id',
+                'presences.waktu_masuk',
+                'presences.waktu_pulang',
+                'presences.status',
                 'employees.nik',
                 'employees.nama',
-                'employees.jabatan'
+                'employees.jabatan',
+                DB::raw("'presence' as type"),
+                DB::raw("NULL as leave_type")
             );
 
-        // Filter by employee name or NIK
+        // 2. Ambil Data Izin (Approved)
+        $permitQuery = \App\Models\Permit::with('employee')
+            ->where('status', 'approved');
+
+        // --- Filter Search (Nama/NIK) ---
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function ($q) use ($search) {
+            $presenceQuery->where(function ($q) use ($search) {
                 $q->where('employees.nama', 'LIKE', "%{$search}%")
                   ->orWhere('employees.nik', 'LIKE', "%{$search}%");
             });
+
+            $permitQuery->whereHas('employee', function ($q) use ($search) {
+                $q->where('nama', 'LIKE', "%{$search}%")
+                  ->orWhere('nik', 'LIKE', "%{$search}%");
+            });
         }
 
-        // Filter by date range
-        if ($request->filled('date_from')) {
-            $query->whereDate('presences.waktu_masuk', '>=', $request->date_from);
+        // --- Filter Date Range ---
+        $dateFrom = $request->date_from;
+        $dateTo = $request->date_to;
+
+        if ($dateFrom) {
+            $presenceQuery->whereDate('presences.waktu_masuk', '>=', $dateFrom);
+            $permitQuery->whereDate('end_date', '>=', $dateFrom); // Ambil permit yang berakhir setelah/pada dateFrom
         }
-        if ($request->filled('date_to')) {
-            $query->whereDate('presences.waktu_masuk', '<=', $request->date_to);
+        if ($dateTo) {
+            $presenceQuery->whereDate('presences.waktu_masuk', '<=', $dateTo);
+            $permitQuery->whereDate('start_date', '<=', $dateTo); // Ambil permit yang mulai sebelum/pada dateTo
         }
 
-        $presences = $query->orderBy('presences.waktu_masuk', 'desc')->paginate(15);
+        // Ambil data raw
+        $rawPresences = $presenceQuery->orderBy('presences.waktu_masuk', 'desc')->get();
+        $rawPermits = $permitQuery->orderBy('start_date', 'desc')->get();
+
+        // 3. Gabungkan & Expand Permit menjadi per-hari
+        $mergedData = collect();
+
+        // Masukkan data presensi
+        foreach ($rawPresences as $p) {
+            $mergedData->push((object)[
+                'date' => Carbon::parse($p->waktu_masuk)->format('Y-m-d'),
+                'datetime' => Carbon::parse($p->waktu_masuk), // untuk sorting
+                'nik' => $p->nik,
+                'nama' => $p->nama,
+                'jabatan' => $p->jabatan,
+                'waktu_masuk' => $p->waktu_masuk,
+                'waktu_pulang' => $p->waktu_pulang,
+                'status' => $p->status,
+                'type' => 'presence',
+                'leave_type' => null
+            ]);
+        }
+
+        // Masukkan data permit (expand date range)
+        foreach ($rawPermits as $permit) {
+            if (!$permit->employee) continue;
+
+            $start = Carbon::parse($permit->start_date);
+            $end = Carbon::parse($permit->end_date);
+            
+            // Filter period sesuai request date range
+            if ($dateFrom && $end->lt(Carbon::parse($dateFrom))) continue;
+            if ($dateTo && $start->gt(Carbon::parse($dateTo))) continue;
+
+            // Adjust start/end loop agar tidak keluar dari filter
+            $loopStart = ($dateFrom && $start->lt(Carbon::parse($dateFrom))) ? Carbon::parse($dateFrom) : $start;
+            $loopEnd = ($dateTo && $end->gt(Carbon::parse($dateTo))) ? Carbon::parse($dateTo) : $end;
+
+            $period = CarbonPeriod::create($loopStart, $loopEnd);
+
+            foreach ($period as $date) {
+                // Cek apakah di tanggal ini user sudah ada presensi? (Opsional: prioritize presence over permit display, or show both)
+                // Disini kita tampilkan saja sebagai baris terpisah atau bisa di-deduplicate jika mau.
+                // Untuk simpelnya, kita masukkan saja, nanti user lihat ada double (izin & masuk) jika kejadian.
+                
+                $mergedData->push((object)[
+                    'date' => $date->format('Y-m-d'),
+                    'datetime' => $date->setTime(0,0,0), // set time 00:00
+                    'nik' => $permit->employee->nik,
+                    'nama' => $permit->employee->nama,
+                    'jabatan' => $permit->employee->jabatan,
+                    'waktu_masuk' => null,
+                    'waktu_pulang' => null,
+                    'status' => 'Izin (' . $this->formatLeaveTypeLabel($permit->leave_type) . ')',
+                    'type' => 'permit',
+                    'leave_type' => $permit->leave_type
+                ]);
+            }
+        }
+
+        // 4. Sorting Descending by Date
+        $sortedData = $mergedData->sortByDesc('datetime')->values();
+
+        // 5. Manual Pagination
+        $perPage = 15;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+        $currentItems = $sortedData->slice(($currentPage - 1) * $perPage, $perPage)->all();
+        
+        $presences = new LengthAwarePaginator(
+            $currentItems, 
+            $sortedData->count(), 
+            $perPage, 
+            $currentPage, 
+            ['path' => Paginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
 
         return view('Admin.presence.history', compact('presences'));
+    }
+
+    protected function formatLeaveTypeLabel($type) {
+        $labels = [
+            'sakit' => 'Sakit',
+            'izin' => 'Izin',
+            'cuti_tahunan' => 'Cuti Tahunan'
+        ];
+        return $labels[$type] ?? ucfirst($type);
     }
 
     public function permitIndex(Request $request)

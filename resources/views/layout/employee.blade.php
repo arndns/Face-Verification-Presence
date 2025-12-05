@@ -52,21 +52,39 @@
             <strong>Ajukan Cuti</strong>
         </a>
 
-        <a href="{{ route('employee.camera') }}" class="item camera-col">
-            <div class="d-flex justify-content-center align-items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
-                    <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
-                    <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
-                    <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
-                    <path d="M9 10v2"></path>
-                    <path d="M15 10v2"></path>
-                    <path d="M12 14c-1 0-1.5.5-1.5 1s.5 1 1.5 1 1.5-.5 1.5-1-.5-1-1.5-1z"></path>
-                    <path d="M9 17c1.5 1 4.5 1 6 0"></path>
-                </svg>
+        @if($approvedPermitToday)
+            <div class="item camera-col" style="opacity: 0.5; cursor: not-allowed;">
+                <div class="d-flex justify-content-center align-items-center" style="background-color: #9ca3af;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                        <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+                        <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+                        <path d="M9 10v2"></path>
+                        <path d="M15 10v2"></path>
+                        <path d="M12 14c-1 0-1.5.5-1.5 1s.5 1 1.5 1 1.5-.5 1.5-1-.5-1-1.5-1z"></path>
+                        <path d="M9 17c1.5 1 4.5 1 6 0"></path>
+                    </svg>
+                </div>
+                <strong>Izin/Cuti</strong>
             </div>
-            <strong>Presensi</strong>
-        </a>
+        @else
+            <a href="{{ route('employee.camera') }}" class="item camera-col" id="bottom-nav-presence">
+                <div class="d-flex justify-content-center align-items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
+                        <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
+                        <path d="M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>
+                        <path d="M9 10v2"></path>
+                        <path d="M15 10v2"></path>
+                        <path d="M12 14c-1 0-1.5.5-1.5 1s.5 1 1.5 1 1.5-.5 1.5-1-.5-1-1.5-1z"></path>
+                        <path d="M9 17c1.5 1 4.5 1 6 0"></path>
+                    </svg>
+                </div>
+                <strong>Presensi</strong>
+            </a>
+        @endif
         <a href="{{route('employee.presence.history')}}" class="item">
             <i class="fa-solid fa-history"></i>
             <strong>History</strong>

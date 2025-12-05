@@ -119,3 +119,62 @@ Setelah menjalankan `php artisan db:seed`, terdapat 2 user default:
   - Radius area kantor ditampilkan dalam circle
   - Auto zoom untuk menampilkan kedua marker
   - Menggunakan Leaflet.js dengan OpenStreetMap
+
+## 2025-12-02 - Allow Multiple Clock-Outs
+- **Objective**: Allow employees to clock out multiple times (e.g., if they stay late after initial clock-out).
+- **Changes**:
+  - **Backend**: Modified `EmployeeController.php`.
+    - Removed the check in `presence` method that blocked clock-out if `waktu_pulang` was already set.
+    - Updated `presenceStatus` method to set `canCheckOut` to true if it is past shift end, even if `hasCheckedOut` is already true.
+  - **Frontend**: Modified `camera.blade.php`.
+    - Updated `getCurrentActionMode` to prioritize `check_out` mode over `done` mode if `canCheckOut` is true.
+    - Added a `recentSuccess` flag with a 15-second cooldown to prevent immediate re-clocking out loops when the user stays on the camera page.
+
+## 2025-12-02 - Add Map to Admin Location Edit
+- **Objective**: Provide a visual map interface for admins to set office location coordinates.
+- **Changes**:
+  - **Frontend**: Modified `resources/views/Admin/lokasi/CRUD/update.blade.php`.
+    - Integrated Leaflet.js map.
+    - Added a draggable marker to set Latitude and Longitude.
+    - Added a circle overlay to visualize the radius.
+    - Implemented two-way binding between the map marker and the input fields.
+    - Added logic to auto-detect user location if coordinates are empty.
+
+## 2025-12-02 - Unify Admin Presence History
+- **Objective**: Match the Admin's presence history view with the Employee's view by including approved leave/permit records.
+- **Changes**:
+  - **Backend**: Modified `AdminController.php`.
+    - Updated `presenceHistory` to fetch both `Presence` and `Permit` records.
+    - Merged and sorted the data by date.
+    - Implemented manual pagination (`LengthAwarePaginator`) for the merged collection.
+  - **Frontend**: Modified `resources/views/Admin/presence/history.blade.php`.
+    - Updated the table to display "Izin/Cuti" status correctly alongside regular attendance.
+
+## 2025-12-02 - Change Locale to Indonesian
+- **Objective**: Ensure date and time formats are displayed in Indonesian (e.g., "Senin, 02 Des 2025").
+- **Changes**:
+  - **Config**: Modified `config/app.php` to set `'locale'` to `'id'`.
+  - **Action**: Cleared configuration cache to apply changes.
+
+## 2025-12-02 - Fix Locale Issue
+- **Objective**: Force application to use Indonesian locale as `.env` was overriding config.
+- **Changes**:
+  - **Environment**: Updated `.env` file to set `APP_LOCALE=id`.
+  - **Provider**: Added `\Carbon\Carbon::setLocale('id')` in `AppServiceProvider` to explicitly enforce Carbon locale.
+  - **Action**: Cleared configuration cache.
+
+## 2025-12-02 - Fix Date Formatting in Views
+- **Objective**: Ensure dates are displayed in Indonesian format (e.g., "03 Des 2025") in views.
+- **Changes**:
+  - **Frontend**: Modified `resources/views/Admin/permit/index.blade.php` and `resources/views/Admin/presence/history.blade.php`.
+    - Replaced `format()` with `translatedFormat()` to utilize the localized date names.
+  - **Frontend**: Modified `resources/views/Employee/permit/history.blade.php`.
+    - Replaced `format()` with `translatedFormat()` for localized date display in employee leave history.
+
+## 2025-12-05 - Disable Presence Buttons Outside Radius
+- **Objective**: Prevent users from attempting to clock in/out when outside the designated office radius.
+- **Changes**:
+  - **Frontend**: Modified `resources/views/Employee/index.blade.php` and `resources/views/layout/employee.blade.php`.
+    - Added IDs to the "Mulai Presensi" button and the bottom navigation "Presensi" button.
+    - Updated the `checkLocation` JavaScript function to dynamically disable these buttons if the calculated distance exceeds the office radius.
+    - Added visual feedback (opacity, cursor change, text update) when buttons are disabled.
