@@ -65,7 +65,7 @@
                                 <option value="up">Menengadah (Atas)</option>
                                 <option value="down">Menunduk (Bawah)</option>
                             </select>
-                            <small class="text-muted">Pilih satu arah lalu tekan "Rekam Wajah". Ulangi untuk tiap arah yang diperlukan.</small>
+                            <small class="text-muted">Arah yang sudah tersimpan akan disembunyikan dari pilihan.</small>
                         </div>
 
                     <div id="saved-orientations-wrapper" class="alert alert-info small {{ empty($existingEmbeddings) || $existingEmbeddings->isEmpty() ? 'd-none' : '' }}">
@@ -204,6 +204,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js"></script>
 
     <script>
+        // Konfigurasi deteksi wajah (MTCNN)
+        const MTCNN_OPTIONS = {
+            minFaceSize: 80,            // abaikan wajah yang terlalu kecil
+            scoreThresholds: [0.6, 0.7, 0.7], // penyaring skor tiap stage
+            scaleFactor: 0.8,           // sedikit lebih kasar supaya lebih cepat
+        };
+
         document.addEventListener("DOMContentLoaded", () => {
 
             const rekamButton = document.getElementById('rekamwajah');
@@ -240,7 +247,7 @@
             if (window.faceapi) return Promise.resolve();
             return new Promise((ok, err) => {
                 const s = document.createElement("script");
-                s.src = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+                s.src = "{{ asset('assets/js/face-api.min.js') }}";
                 s.onload = ok;
                 s.onerror = err;
                 document.head.appendChild(s);
@@ -248,10 +255,14 @@
         }
 
         async function loadFaceModels() {
-            const MODEL_URL = 'https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/models';
-            await faceapi.nets.mtcnn.loadFromUri('/models');
-            await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-            await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+            const MODEL_URL = '/models';
+            await faceapi.nets.mtcnn.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+            await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+        }
+
+        function getMtcnnOptions() {
+            return new faceapi.MtcnnOptions(MTCNN_OPTIONS);
         }
 
         function startCamera() {
@@ -287,7 +298,7 @@
         function runDetect(video, canvas, box) {
             const ctx = canvas.getContext('2d');
 
-            const opts = new faceapi.MtcnnOptions();
+            const opts = getMtcnnOptions();
 
             const dpr = window.devicePixelRatio || 1;
             const rekamButton = document.getElementById('rekamwajah');
@@ -344,6 +355,18 @@
             const adminDataUrl = document.getElementById('admin-data-route')?.href || null;
             const savedWrapper = document.getElementById('saved-orientations-wrapper');
             const savedList = document.getElementById('saved-orientations');
+            const updateOrientationOptions = () => {
+                const options = Array.from(orientationSelect.options || []);
+                options.forEach(opt => {
+                    const val = (opt.value || '').toLowerCase();
+                    opt.hidden = existingOrientations.has(val);
+                });
+                // Pastikan value selalu ke opsi pertama yang tidak tersembunyi
+                const firstVisible = options.find(opt => !opt.hidden);
+                if (firstVisible) {
+                    orientationSelect.value = firstVisible.value;
+                }
+            };
 
             if (!button || !video || !employeeIdInput || !csrfTokenMeta || !orientationSelect) {
                 Swal.fire(
@@ -368,6 +391,7 @@
                     savedList.appendChild(span);
                 });
                 savedWrapper.classList.toggle('d-none', existingOrientations.size === 0);
+                updateOrientationOptions();
             };
             renderSavedOrientations();
 
@@ -401,7 +425,7 @@
                 setLoading(true, 'Mengambil wajah...');
 
                 try {
-                    const detection = await faceapi.detectSingleFace(video, new faceapi.MtcnnOptions())
+                    const detection = await faceapi.detectSingleFace(video, getMtcnnOptions())
                         .withFaceLandmarks()
                         .withFaceDescriptor();
 

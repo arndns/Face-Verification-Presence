@@ -36,6 +36,17 @@
                     <p id="status-message" class="mb-0 text-muted small">Posisikan wajah Anda di dalam bingkai.</p>
                 </div>
             </div>
+
+            <div class="w-100">
+                <button class="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center gap-2"
+                    id="attendance-action-btn" data-user-id="{{ $user->id ?? auth()->id() }}">
+                    <i class="fa-solid fa-fingerprint"></i>
+                    <span id="button-text">Mulai Presensi</span>
+                </button>
+                <small class="text-muted d-block mt-2">
+                    Tekan jika verifikasi otomatis belum berjalan atau ingin mengulang proses presensi.
+                </small>
+            </div>
         </div>
     </div>
 
@@ -80,9 +91,15 @@
         const FRAME_DELAY_MS = 120;
         const VIDEO_MIRRORED = true;
         const STATUS_POLL_INTERVAL_MS = 60000;
+        const MTCNN_OPTIONS = {
+            minFaceSize: 80,
+            scoreThresholds: [0.6, 0.7, 0.7],
+            scaleFactor: 0.8
+        };
         let referenceEmbeddings = []; // Diisi saat init() dari API (multi-orientasi)
         let isVerifying = false;
         let recentSuccess = false;
+        let attendanceButtonInitialized = false;
         const presenceState = {
             hasCheckedIn: false,
             hasCheckedOut: false,
@@ -120,6 +137,71 @@
         let locationAlertDismissed = false;
         let locationAlertLastType = null;
         let locationAlertLastMessage = null;
+
+        function getAttendanceButtonElements() {
+            return {
+                button: document.getElementById('attendance-action-btn'),
+                text: document.getElementById('button-text'),
+            };
+        }
+
+        function setButtonLoadingState(message = 'Memverifikasi...') {
+            const { button, text } = getAttendanceButtonElements();
+            if (button) button.disabled = true;
+            if (text) text.textContent = message;
+        }
+
+        function applyButtonIdleState() {
+            const { button, text } = getAttendanceButtonElements();
+            if (!button || !text) return;
+
+            if (isVerifying) {
+                text.textContent = text.textContent || 'Memverifikasi...';
+                button.disabled = true;
+                return;
+            }
+
+            let label = 'Mulai Presensi';
+            let disabled = false;
+            const mode = getCurrentActionMode();
+
+            if (mode === 'check_out') {
+                label = 'Presensi Pulang';
+            } else if (mode === 'check_in') {
+                label = 'Presensi Masuk';
+            } else if (mode === 'done') {
+                label = 'Presensi Selesai';
+                disabled = true;
+            } else if (mode === 'waiting') {
+                label = 'Menunggu Jam Pulang';
+                disabled = true;
+            } else if (mode === 'on_leave') {
+                label = 'Sedang Izin/Cuti';
+                disabled = true;
+            }
+
+            if (!EMPLOYEE_LOCATION) {
+                label = 'Lokasi belum diatur';
+                disabled = true;
+            } else if (!locationValidation.ready) {
+                label = 'Menunggu lokasi...';
+                disabled = true;
+            } else if (!locationValidation.isInsideRadius) {
+                label = 'Di luar radius';
+                disabled = true;
+            }
+
+            text.textContent = label;
+            button.disabled = disabled || isVerifying;
+        }
+
+        function resetButton(customText = null) {
+            const { button, text } = getAttendanceButtonElements();
+            isVerifying = false;
+            if (button) button.disabled = false;
+            if (text && customText) text.textContent = customText;
+            applyButtonIdleState();
+        }
 
         function confirmExit() {
             if (window.Swal && typeof Swal.fire === 'function') {
@@ -237,6 +319,7 @@
             }
 
             init();
+            applyButtonIdleState();
         });
 
 
@@ -413,7 +496,15 @@
         }
 
         async function init() {
-            await ensureFaceAPI(); // 1. Muat library Face-API
+            await ensureFaceAPI(); 
+            // Uji fungsi jarak Face API dengan panjang descriptor 128 (lebih relevan)
+            try {
+                const makeDescriptor = (val) => new Array(128).fill(val);
+                const testDist = faceapi.euclideanDistance(makeDescriptor(0.12), makeDescriptor(0.14));
+                console.log('FaceAPI descriptor test distance (~0.226 expected):', testDist);
+            } catch (e) {
+                console.warn('FaceAPI distance test gagal:', e);
+            }
 
             // Tampilkan loading, tapi biarkan kamera mulai
             Swal.fire({
@@ -436,6 +527,7 @@
                 await Promise.all([cameraPromise, modelsPromise, embeddingPromise]);
 
                 Swal.close(); // Tutup loading saat semua siap
+                tryInitAttendanceButton(document.querySelector('.camera-capture video'));
                 
             } catch (error) {
                 Swal.fire({
@@ -456,6 +548,10 @@
                 s.onerror = err;
                 document.head.appendChild(s);
             });
+        }
+
+        function getMtcnnOptions() {
+            return new faceapi.MtcnnOptions(MTCNN_OPTIONS);
         }
 
         async function loadFaceModels() {
@@ -690,6 +786,7 @@
 
                 const displayName =
                     @json(optional(optional($user)->employee)->nama ?? (optional(optional($user)->employee)->nik ?? 'Tidak dikenali'));
+                tryInitAttendanceButton(video);
                 if (video.readyState >= 2) {
                     runDetect(video, overlay, wrap, displayName);
                 } else {
@@ -711,9 +808,7 @@
 
         function runDetect(video, canvas, box, displayName) {
             const ctx = canvas.getContext('2d');
-            const opts = new faceapi.MtcnnOptions({
-                minFaceSize: 100
-            });
+            const opts = getMtcnnOptions();
             const dpr = window.devicePixelRatio || 1;
             const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
             const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
@@ -805,10 +900,9 @@
                         ctx.restore();
                     });
 
-                    // Logika Auto-Presensi
+                    // Hanya tampilkan status; proses presensi dijalankan via tombol manual
                     if (recognizedFaces === 1 && resizedResults.length === 1) {
-                        updateStatusIndicator('Memverifikasi...', 'Tahan posisi wajah Anda...', 'primary', true);
-                        await performVerification(video, csrfToken);
+                        updateStatusIndicator('Siap Presensi', 'Satu wajah terdeteksi. Tekan tombol untuk melanjutkan.', 'primary');
                     } else if (resizedResults.length > 1) {
                         updateStatusIndicator('Terlalu Banyak Wajah', 'Pastikan hanya satu wajah di kamera.', 'warning');
                     } else {
@@ -828,7 +922,7 @@
             if (isVerifying) return;
             isVerifying = true;
 
-            const mtcnnOptions = new faceapi.MtcnnOptions({ minFaceSize: 100 });
+            const mtcnnOptions = getMtcnnOptions();
 
             try {
                 const collectedDescriptors = [];
@@ -1017,6 +1111,7 @@
 
                 isVerifying = true; // Kunci proses
                 button.disabled = true;
+                setButtonLoadingState('Memverifikasi...');
 
                 console.log('�Y"? Memulai proses verifikasi...');
 
@@ -1028,9 +1123,7 @@
                     showConfirmButton: false,
                 });
 
-                const mtcnnOptions = new faceapi.MtcnnOptions({
-                    minFaceSize: 100
-                });
+                const mtcnnOptions = getMtcnnOptions();
 
                 try {
                     const collectedDescriptors = [];
@@ -1315,6 +1408,8 @@
                     showReminderModal('checkout', data.shift);
                 }
             }
+
+            applyButtonIdleState();
         }
 
         function showReminderModal(type, shiftInfo = {}) {
@@ -1351,6 +1446,18 @@
                 return 'check_in';
             }
             return 'waiting';
+        }
+
+        function tryInitAttendanceButton(videoEl) {
+            if (attendanceButtonInitialized) return;
+            if (!videoEl) return;
+            if (!referenceEmbeddings.length) {
+                setTimeout(() => tryInitAttendanceButton(videoEl), 300);
+                return;
+            }
+            setupAttendanceButton('attendance-action-btn', videoEl);
+            attendanceButtonInitialized = true;
+            applyButtonIdleState();
         }
 
 
