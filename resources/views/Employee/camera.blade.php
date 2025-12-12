@@ -497,7 +497,6 @@
 
         async function init() {
             await ensureFaceAPI(); 
-            // Uji fungsi jarak Face API dengan panjang descriptor 128 (lebih relevan)
             try {
                 const makeDescriptor = (val) => new Array(128).fill(val);
                 const testDist = faceapi.euclideanDistance(makeDescriptor(0.12), makeDescriptor(0.14));

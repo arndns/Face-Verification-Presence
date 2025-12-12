@@ -32,10 +32,12 @@
                         <a href="{{ route('admin.create') }}"class="btn btn-success">Tambah Data</a>
 
                         <!-- Form Pencarian dengan Ikon di dalam -->
-                        <form action="#" method="GET" class="search-form ms-auto">
+                        <form action="{{ route('admin.data') }}" method="GET" class="search-form ms-auto">
                             <div class="search-input-container">
                                 <i class="fa-solid fa-magnifying-glass search-icon"></i>
-                                <input type="text" name="search" class="form-control" placeholder="Cari Data Pegawai">
+                                <input type="text" name="search" class="form-control"
+                                    placeholder="Cari NIK, Email, atau Nama"
+                                    value="{{ request('search', $search ?? '') }}">
                             </div>
                         </form>
                     </div>
@@ -108,9 +110,9 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <div class="alert alert-danger">
-                                        Data Pegawai belum tersedia
-                                    </div>
+                                    <tr>
+                                        <td colspan="9" class="text-center">Tidak ada data pegawai.</td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>

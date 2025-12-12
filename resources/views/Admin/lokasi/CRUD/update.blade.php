@@ -9,7 +9,7 @@
                     <div class="card-body p-5">
                         <div class="text-center mb-4">
                             <i class="fas fa-map-marked-alt fa-3x text-primary mb-3"></i>
-                            <h1 class="card-title fs-3 fw-bold mb-2">Pendaftaran Data Lokasi</h1>
+                            <h1 class="card-title fs-3 fw-bold mb-2"> Data Lokasi</h1>
                             <p class="card-subtitle text-muted">Silakan isi informasi di bawah ini untuk menambahkan data
                                 lokasi baru.</p>
                         </div>

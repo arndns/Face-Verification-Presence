@@ -37,10 +37,23 @@ class AdminController extends Controller
         return view('Admin.index', compact('totalEmployees', 'presenceToday', 'permitsToday'));
     }
 
-    public function viewdata()
+    public function viewdata(Request $request)
     {
-        $employee = Employee::orderBy('id', 'asc')->paginate(5);
-        return view('Admin.pegawai.data', compact('employee'));
+        $search = $request->input('search');
+
+        $employee = Employee::query()
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('nik', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('nama', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('id', 'asc')
+            ->paginate(5)
+            ->withQueryString();
+
+        return view('Admin.pegawai.data', compact('employee', 'search'));
     }
 
     
