@@ -29,14 +29,6 @@
                 </div>
             </div>
             
-            <div class="w-100 mb-3 text-center">
-                <div id="status-indicator" class="p-3 rounded-3 shadow-sm bg-white border">
-                    <div class="spinner-border text-primary mb-2 d-none" role="status" id="loading-spinner"></div>
-                    <h5 id="status-title" class="mb-1 fw-bold text-dark">Menunggu Wajah...</h5>
-                    <p id="status-message" class="mb-0 text-muted small">Posisikan wajah Anda di dalam bingkai.</p>
-                </div>
-            </div>
-
             <div class="w-100">
                 <button class="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center gap-2"
                     id="attendance-action-btn" data-user-id="{{ $user->id ?? auth()->id() }}">
@@ -130,6 +122,10 @@
             isInsideRadius: false,
             distanceMeters: null,
         };
+        const detectionState = {
+            status: 'idle', // idle | ready | unknown | multiple | no_face
+            lastChangedAt: null,
+        };
         // Map variables removed
         let locationNotConfiguredModalShown = false;
         let outsideRadiusModalShown = false;
@@ -143,6 +139,15 @@
                 button: document.getElementById('attendance-action-btn'),
                 text: document.getElementById('button-text'),
             };
+        }
+
+        function setDetectionState(status) {
+            if (!status || detectionState.status === status) {
+                return;
+            }
+            detectionState.status = status;
+            detectionState.lastChangedAt = Date.now();
+            applyButtonIdleState();
         }
 
         function setButtonLoadingState(message = 'Memverifikasi...') {
@@ -189,6 +194,21 @@
             } else if (!locationValidation.isInsideRadius) {
                 label = 'Di luar radius';
                 disabled = true;
+            }
+
+            if (!disabled) {
+                if (detectionState.status === 'ready') {
+                    label = 'Siap Presensi';
+                } else if (detectionState.status === 'multiple') {
+                    label = 'Terlalu Banyak Wajah';
+                    disabled = true;
+                } else if (detectionState.status === 'unknown') {
+                    label = 'Wajah Tidak Dikenali';
+                    disabled = true;
+                } else if (detectionState.status === 'no_face') {
+                    label = 'Cari Wajah';
+                    disabled = true;
+                }
             }
 
             text.textContent = label;
@@ -901,10 +921,16 @@
 
                     // Hanya tampilkan status; proses presensi dijalankan via tombol manual
                     if (recognizedFaces === 1 && resizedResults.length === 1) {
-                        updateStatusIndicator('Siap Presensi', 'Satu wajah terdeteksi. Tekan tombol untuk melanjutkan.', 'primary');
+                        setDetectionState('ready');
+                        updateStatusIndicator('Wajah Dikenali', 'Tekan tombol presensi untuk melanjutkan.', 'primary');
                     } else if (resizedResults.length > 1) {
+                        setDetectionState('multiple');
                         updateStatusIndicator('Terlalu Banyak Wajah', 'Pastikan hanya satu wajah di kamera.', 'warning');
+                    } else if (resizedResults.length === 1 && recognizedFaces === 0) {
+                        setDetectionState('unknown');
+                        updateStatusIndicator('Wajah Tidak Dikenali', 'Coba posisikan wajah lebih jelas.', 'danger');
                     } else {
+                        setDetectionState('no_face');
                         updateStatusIndicator('Menunggu Wajah...', 'Posisikan wajah Anda di dalam bingkai.', 'secondary');
                     }
 
@@ -971,6 +997,16 @@
             const msgEl = document.getElementById('status-message');
             const spinner = document.getElementById('loading-spinner');
             const container = document.getElementById('status-indicator');
+
+            // Fallback: jika kartu status dihilangkan, tampilkan info lewat tombol
+            if (!titleEl && !msgEl && !spinner && !container) {
+                const { button, text } = getAttendanceButtonElements();
+                if (text && title) text.textContent = title;
+                if (button && (loading || type === 'danger' || type === 'warning')) {
+                    button.disabled = true;
+                }
+                return;
+            }
 
             if (titleEl) titleEl.textContent = title;
             if (msgEl) msgEl.textContent = message;

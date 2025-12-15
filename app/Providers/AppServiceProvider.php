@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Auth\CustomUserProvider;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
@@ -29,7 +30,10 @@ class AppServiceProvider extends ServiceProvider
         if (!$this->app->runningInConsole()) {
             URL::forceRootUrl(request()->getSchemeAndHttpHost());
         }
-        
+
         \Carbon\Carbon::setLocale(config('app.locale'));
+
+        
+        Paginator::useBootstrapFive();
     }
 }
