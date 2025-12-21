@@ -20,6 +20,11 @@
 /storage/*.key
 /storage/pail
 /vendor
+# Local tool binaries and one-off artifacts
+/bin/
+/cloudflared.exe
+/mkcert.exe
+/get()
 /# ignore design diagrams
 /docs/*.puml
 Homestead.json
