@@ -30,6 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
 // modal peringatan
 document.addEventListener("DOMContentLoaded", function () {
     var errorModalElement = document.getElementById("errorModal");
+    if (!errorModalElement) return;
     var errorModal = new bootstrap.Modal(errorModalElement);
     errorModal.show();
 });

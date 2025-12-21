@@ -39,6 +39,30 @@
                     Tekan jika verifikasi otomatis belum berjalan atau ingin mengulang proses presensi.
                 </small>
             </div>
+
+            <div class="w-100 mt-4 presence-map-card">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="mb-0">Lokasi Presensi</h6>
+                            @if ($employeeLocationPayload)
+                                <span class="badge bg-primary">Radius {{ $employeeLocationPayload['radius'] ?? 0 }} m</span>
+                            @endif
+                        </div>
+                        <div id="presence-map" class="presence-map rounded"></div>
+                        <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mt-3">
+                            <div>
+                                <div class="small mb-1 text-muted">Koordinat perangkat</div>
+                                <div class="fw-semibold" id="location-status-text">Mencari lokasi...</div>
+                                <div class="text-muted small" id="location-distance-text"></div>
+                            </div>
+                            <button class="btn btn-outline-primary btn-sm" id="refresh-location-btn">
+                                <i class="fa-solid fa-location-crosshairs me-1"></i> Periksa Lokasi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -58,40 +82,148 @@
             margin: 0 auto;
         }
 
+        .presence-map {
+            width: 100%;
+            min-height: 240px;
+            background: #f8fafc;
+            border-radius: 12px;
+            overflow: hidden;
+        }
 
+        /* Matikan peta di halaman presensi (menggunakan koordinat dari dashboard) */
+        .presence-map-card {
+            display: none !important;
+        }
 
         .camera-page {
             padding-bottom: 90px;
         }
+
+        /* Nonaktifkan interaksi saat lokasi masih diproses */
+        .location-loading-active .camera-page button,
+        .location-loading-active .camera-page .btn,
+        .location-loading-active .app-bottom-menu a,
+        .location-loading-active [data-presence-nav] {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+        /* Nonaktifkan interaksi jika geolokasi diblokir/diminta ulang */
+        .presence-disabled .camera-page button,
+        .presence-disabled .camera-page .btn,
+        .presence-disabled .app-bottom-menu a,
+        .presence-disabled [data-presence-nav] {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        /* Responsif untuk SweetAlert agar tidak menutupi tombol di mobile/desktop */
+        .swal2-container {
+            padding: 12px;
+        }
+        .swal2-popup {
+            width: min(460px, 92vw);
+            border-radius: 12px;
+        }
+        .swal2-actions {
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .swal2-styled {
+            min-width: 120px;
+            flex: 1 1 auto;
+        }
+        @media (max-width: 576px) {
+            .swal2-popup {
+                padding: 18px 14px;
+            }
+            .swal2-title {
+                font-size: 1.1rem;
+            }
+            .swal2-html-container {
+                font-size: 0.95rem;
+            }
+        }
+
+        /* Modal hasil presensi */
+        .swal-presence-popup {
+            width: min(520px, 94vw);
+            border-radius: 16px;
+            padding: 20px 18px;
+        }
+        .swal-presence-popup .swal2-title {
+            font-size: 1.25rem;
+        }
+        .swal-presence-popup .swal2-html-container {
+            text-align: left;
+            font-size: 0.98rem;
+            line-height: 1.4;
+        }
+        .swal-presence-confirm {
+            min-width: 140px;
+            padding: 10px 14px;
+            font-weight: 700;
+        }
+        @media (max-width: 576px) {
+            .swal-presence-popup {
+                padding: 16px 14px;
+            }
+            .swal-presence-popup .swal2-title {
+                font-size: 1.1rem;
+            }
+            .swal-presence-popup .swal2-html-container {
+                font-size: 0.95rem;
+            }
+        }
+
     </style>
 
 
 @endsection
 @section('script')
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // --- Variabel Global ---
         const EMPLOYEE_LOCATION = @json($employeeLocationPayload);
-        const GEOLOCATION_OPTIONS = {
-            enableHighAccuracy: true,
-            maximumAge: 0,
-            timeout: 20000
+        const GEOLOCATION_OPTIONS_FAST = {
+            enableHighAccuracy: false,
+            maximumAge: 30000,
+            timeout: 15000
         };
-        const FACE_VERIFICATION_THRESHOLD = 0.38; // Threshold Euclidean Distance
-        const FACE_VERIFICATION_MARGIN = 0.03; // toleransi rata-rata
+        const GEOLOCATION_OPTIONS_PRECISE = {
+            enableHighAccuracy: true,
+            maximumAge: 15000,
+            timeout: 30000
+        };
+        const FACE_VERIFICATION_THRESHOLD = 0.38; // 
+        const FACE_VERIFICATION_MARGIN = 0.03; // 
+        const FACE_MATCH_LIMIT = FACE_VERIFICATION_THRESHOLD + FACE_VERIFICATION_MARGIN;
         const VERIFICATION_SAMPLES = 5;
-        const REQUIRED_MATCHES = 4;
+        const REQUIRED_MATCHES = 3;
         const FRAME_DELAY_MS = 120;
-        const VIDEO_MIRRORED = true;
+        const VIDEO_MIRRORED = false;
+        const NAME_MIRRORED = true;
         const STATUS_POLL_INTERVAL_MS = 60000;
         const MTCNN_OPTIONS = {
-            minFaceSize: 80,
-            scoreThresholds: [0.6, 0.7, 0.7],
+            minFaceSize: 60,
+            scoreThresholds: [0.5, 0.6, 0.7],
             scaleFactor: 0.8
         };
+        const FACE_MODEL_BASE_URL = `${window.location.origin}/models`;
+        const MAX_ACCEPTABLE_ACCURACY = 100; // meters
+        const MAX_JUMP_METERS = 200; // ignore sudden jumps
+        const GEO_SMOOTH_HISTORY = 5;
+        const GEO_MAX_POSITION_AGE_MS = 15000;
+        const GEO_MIN_MOVEMENT_METERS = 12;
+        const GEO_ACCURACY_IMPROVEMENT_MARGIN = 5;
+        const GEO_STABLE_ACCURACY = 35;
+        const MAP_DISABLED = true; // jangan tampilkan peta di halaman presensi
+        const USE_DASHBOARD_GPS = true; // ambil koordinat dari GPS yang dikirim di dashboard
         let referenceEmbeddings = []; // Diisi saat init() dari API (multi-orientasi)
         let isVerifying = false;
         let recentSuccess = false;
         let attendanceButtonInitialized = false;
+        let faceApiScriptPromise = null;
+        let faceModelPromise = null;
+        let recognitionModelPromise = null;
         const presenceState = {
             hasCheckedIn: false,
             hasCheckedOut: false,
@@ -112,20 +244,41 @@
         let lokasiInput = null;
         let locationAlertElement = null;
         let locationAlertTextElement = null;
+        let locationStatusTextEl = null;
+        let locationDistanceTextEl = null;
+        let refreshLocationBtn = null;
+        const LOCATION_CACHE_MAX_AGE_MS = 5 * 60 * 1000; // 5 menit
+        let presenceMap = null;
+        let officeMarker = null;
+        let userMarker = null;
+        let radiusCircle = null;
+        let lastDetectAt = 0;
+        const DETECTION_INTERVAL_MS = 220; // turunkan beban CPU pada perangkat lemah
         const geoState = {
             latitude: null,
             longitude: null,
             accuracy: null,
         };
+        let lastStableFix = null;
+        const geoHistory = [];
         const locationValidation = {
             ready: false,
             isInsideRadius: false,
             distanceMeters: null,
         };
+        let locationLoading = true;
         const detectionState = {
             status: 'idle', // idle | ready | unknown | multiple | no_face
             lastChangedAt: null,
         };
+        function setLocationLoadingState(isLoading, message = null) {
+            locationLoading = isLoading;
+            document.body.classList.toggle('location-loading-active', Boolean(isLoading));
+            if (message && locationStatusTextEl) {
+                locationStatusTextEl.textContent = message;
+                if (locationDistanceTextEl) locationDistanceTextEl.textContent = '';
+            }
+        }
         // Map variables removed
         let locationNotConfiguredModalShown = false;
         let outsideRadiusModalShown = false;
@@ -133,6 +286,8 @@
         let locationAlertDismissed = false;
         let locationAlertLastType = null;
         let locationAlertLastMessage = null;
+        let geoWatchId = null;
+        let geoRetryTimer = null;
 
         function getAttendanceButtonElements() {
             return {
@@ -189,10 +344,7 @@
                 label = 'Lokasi belum diatur';
                 disabled = true;
             } else if (!locationValidation.ready) {
-                label = 'Menunggu lokasi...';
-                disabled = true;
-            } else if (!locationValidation.isInsideRadius) {
-                label = 'Di luar radius';
+                label = 'Mengambil lokasi...';
                 disabled = true;
             }
 
@@ -247,71 +399,173 @@
         }
 
         function initializeGeolocation() {
+            if (USE_DASHBOARD_GPS) {
+                if (locationValidation.ready && geoState.latitude !== null && geoState.longitude !== null) {
+                    setLocationLoadingState(false);
+                } else {
+                    setLocationLoadingState(true, 'Menunggu data lokasi dari dashboard...');
+                }
+                return;
+            }
+            if (geoRetryTimer) {
+                clearTimeout(geoRetryTimer);
+                geoRetryTimer = null;
+            }
             const isSecure = window.isSecureContext || ['localhost', '127.0.0.1'].includes(location.hostname);
             if (!isSecure) {
                 const insecureMessage =
                     'Browser memblokir geolokasi karena halaman tidak diakses via HTTPS/localhost. Buka lewat https atau localhost agar izin lokasi muncul.';
                 updateLocationAlert(insecureMessage, 'warning');
-                return;
+                // Tetap coba meminta lokasi; beberapa browser masih mengizinkan di HTTP (mobile/local)
             }
 
             if (!navigator.geolocation) {
                 updateLocationAlert('Perangkat Anda tidak mendukung geolocation.', 'danger');
+                setLocationLoadingState(true, 'Perangkat tidak mendukung geolokasi.');
                 return;
             }
 
-            navigator.geolocation.getCurrentPosition(successCallback, errorCallback, GEOLOCATION_OPTIONS);
-            navigator.geolocation.watchPosition(successCallback, errorCallback, GEOLOCATION_OPTIONS);
+            if (geoWatchId !== null) {
+                navigator.geolocation.clearWatch(geoWatchId);
+                geoWatchId = null;
+            }
+
+            navigator.geolocation.getCurrentPosition(successCallback, errorCallback, GEOLOCATION_OPTIONS_FAST);
+            geoWatchId = navigator.geolocation.watchPosition(successCallback, errorCallback, GEOLOCATION_OPTIONS_PRECISE);
+        }
+
+        function wireLocationButton() {
+            if (!refreshLocationBtn) return;
+            if (USE_DASHBOARD_GPS) {
+                refreshLocationBtn.classList.add('d-none');
+                return;
+            }
+            const restore = () => {
+                refreshLocationBtn.disabled = false;
+                refreshLocationBtn.innerHTML = '<i class="fa-solid fa-location-crosshairs me-1"></i> Periksa Lokasi';
+            };
+            refreshLocationBtn.addEventListener('click', () => {
+                if (!navigator.geolocation) {
+                    updateLocationStatusUI('Perangkat tidak mendukung geolokasi', true);
+                    return;
+                }
+                refreshLocationBtn.disabled = true;
+                refreshLocationBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Memeriksa...';
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        successCallback(pos);
+                        restore();
+                    },
+                    (err) => {
+                        errorCallback(err);
+                        restore();
+                    },
+                    GEOLOCATION_OPTIONS_FAST
+                );
+            });
         }
 
         function successCallback(position) {
-            geoState.latitude = position.coords.latitude;
-            geoState.longitude = position.coords.longitude;
-            geoState.accuracy = position.coords.accuracy ?? null;
+            applySmoothedLocation(position);
 
-            if (lokasiInput) {
-                lokasiInput.value = `${geoState.latitude},${geoState.longitude}`;
+            // Sinkronkan dengan cache lokasi (dipakai juga oleh dashboard)
+            try {
+                sessionStorage.setItem('employeeLastGeo', JSON.stringify({
+                    latitude: geoState.latitude,
+                    longitude: geoState.longitude,
+                    accuracy: geoState.accuracy ?? null,
+                    ts: Date.now()
+                }));
+                sessionStorage.removeItem('employeeGeoBlocked');
+                document.body.classList.remove('presence-disabled');
+            } catch (e) {
+                console.warn('Gagal menyimpan cache lokasi:', e);
             }
 
             missingLocationModalShown = false;
 
             validateEmployeeLocation();
             updateLocationAlert();
+            updatePresenceMapWithUser();
+            updateLocationStatusUI();
+            if (locationValidation.ready && geoState.latitude !== null && geoState.longitude !== null) {
+                setLocationLoadingState(false);
+                applyButtonIdleState();
+            }
         }
 
         function errorCallback(error) {
             console.warn('Tidak dapat membaca lokasi pengguna:', error);
-            geoState.latitude = null;
-            geoState.longitude = null;
-            geoState.accuracy = null;
+            const code = (error && typeof error.code !== 'undefined') ? error.code : null;
+            const hasFallback = lastStableFix || (geoState.latitude !== null && geoState.longitude !== null);
+            if (!hasFallback) {
+                geoState.latitude = null;
+                geoState.longitude = null;
+                geoState.accuracy = null;
+                lastStableFix = null;
+                geoHistory.length = 0;
+                try {
+                    sessionStorage.removeItem('employeeLastGeo');
+                } catch (e) {
+                    // abaikan
+                }
 
-            if (lokasiInput) {
-                lokasiInput.value = '';
+                if (lokasiInput) {
+                    lokasiInput.value = '';
+                }
+
+                locationValidation.ready = false;
+                locationValidation.isInsideRadius = false;
+                locationValidation.distanceMeters = null;
             }
-
-            locationValidation.ready = false;
-            locationValidation.isInsideRadius = false;
-            locationValidation.distanceMeters = null;
 
             let message = 'Berikan izin lokasi agar presensi dapat diverifikasi.';
-            switch (error.code) {
-                case error.PERMISSION_DENIED:
-                    message = "Perizinan lokasi ditolak. Izin diperlukan untuk presensi.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    message = "Informasi lokasi tidak tersedia.";
-                    break;
-                case error.TIMEOUT:
-                    message = "Permintaan lokasi melebihi batas waktu.";
-                    break;
-                default:
-                    message = "Terjadi kesalahan saat membaca lokasi perangkat.";
-                    break;
+            if (code === (error?.PERMISSION_DENIED)) {
+                message = "Perizinan lokasi ditolak. Izin diperlukan untuk presensi.";
+            } else if (code === (error?.POSITION_UNAVAILABLE)) {
+                message = "Informasi lokasi tidak tersedia.";
+            } else if (code === (error?.TIMEOUT)) {
+                message = "Permintaan lokasi melebihi batas waktu.";
+            } else if (code !== null) {
+                message = "Terjadi kesalahan saat membaca lokasi perangkat.";
             }
 
-            updateLocationAlert(message, 'danger');
-            showLocationRequirementModal(message);
-            updateStatusIndicator('Lokasi Error', message, 'danger');
+            if (hasFallback) {
+                const statusMsg = code === (error?.TIMEOUT)
+                    ? 'GPS lambat/timeout, gunakan lokasi terakhir dan coba ulang.'
+                    : 'GPS terbaru tidak tersedia, gunakan lokasi terakhir.';
+                updateStatusIndicator('Menggunakan lokasi sebelumnya', statusMsg, 'warning');
+                validateEmployeeLocation();
+                updateLocationAlert(message, code === (error?.TIMEOUT) ? 'warning' : 'danger');
+                updateLocationStatusUI();
+                updatePresenceMapWithUser();
+                if (locationValidation.ready && geoState.latitude !== null && geoState.longitude !== null) {
+                    setLocationLoadingState(false);
+                    applyButtonIdleState();
+                }
+            } else {
+                updateLocationAlert(message, 'danger');
+                showLocationRequirementModal(message);
+                updateStatusIndicator(code === (error?.TIMEOUT) ? 'Lokasi Timeout' : 'Lokasi Error', message, 'danger');
+                updateLocationStatusUI(message, true);
+                setLocationLoadingState(true, message);
+            }
+
+            if (code === (error?.PERMISSION_DENIED)) {
+                try {
+                    sessionStorage.setItem('employeeGeoBlocked', '1');
+                } catch (e) {
+                    // ignore
+                }
+                document.body.classList.add('presence-disabled');
+                return;
+            }
+            if (!geoRetryTimer) {
+                geoRetryTimer = setTimeout(() => {
+                    geoRetryTimer = null;
+                    initializeGeolocation();
+                }, code === (error?.TIMEOUT) ? 3000 : 5000);
+            }
         }
 
  
@@ -320,6 +574,10 @@
             lokasiInput = document.getElementById('location');
             locationAlertElement = document.getElementById('locationAlertWrapper');
             locationAlertTextElement = document.getElementById('locationValidationStatusText');
+            locationStatusTextEl = document.getElementById('location-status-text');
+            locationDistanceTextEl = document.getElementById('location-distance-text');
+            refreshLocationBtn = document.getElementById('refresh-location-btn');
+            setLocationLoadingState(true, 'Mengambil koordinat dari dashboard...');
 
             if (!EMPLOYEE_LOCATION) {
                 ensureLocationConfigured();
@@ -327,7 +585,10 @@
                 updateLocationAlert();
             }
 
+            initPresenceMap();
+            loadCachedGeoLocation();
             initializeGeolocation();
+            wireLocationButton();
 
             monitorPresenceStatus({ showReminders: true });
             if (!presenceStatusInterval) {
@@ -390,6 +651,9 @@
             }
 
             updateStatusIndicatorForLocation();
+            applyButtonIdleState();
+            updatePresenceMapWithUser();
+            updateLocationStatusUI();
         }
 
         function updateLocationAlert(message = null, status = 'info') {
@@ -414,7 +678,6 @@
                 return;
             }
 
-            // Notifikasi radius hanya melalui modal; sembunyikan alert jika lokasi sudah terbaca.
             hideLocationAlert();
         }
 
@@ -455,6 +718,33 @@
             locationAlertElement.classList.add('d-none');
         }
 
+        function updateLocationStatusUI(errorMessage = null, isError = false) {
+            if (!locationStatusTextEl || !locationDistanceTextEl) return;
+
+            if (errorMessage) {
+                locationStatusTextEl.textContent = errorMessage;
+                locationDistanceTextEl.textContent = '';
+                return;
+            }
+
+            if (geoState.latitude === null || geoState.longitude === null) {
+                locationStatusTextEl.textContent = 'Mencari lokasi...';
+                locationDistanceTextEl.textContent = '';
+                return;
+            }
+
+            locationStatusTextEl.textContent = `${geoState.latitude.toFixed(5)}, ${geoState.longitude.toFixed(5)}`;
+
+            if (locationValidation.ready && locationValidation.distanceMeters !== null) {
+                const radiusLimit = Number(EMPLOYEE_LOCATION?.radius || 0);
+                const insideText = locationValidation.isInsideRadius ? 'Dalam radius' : 'Di luar radius';
+                locationDistanceTextEl.textContent =
+                    `${locationValidation.distanceMeters.toFixed(1)} m dari kantor (${insideText}${radiusLimit ? `, batas ${radiusLimit} m` : ''})`;
+            } else {
+                locationDistanceTextEl.textContent = '';
+            }
+        }
+
         function calculateDistanceMeters(lat1, lon1, lat2, lon2) {
             const R = 6371000;
             const φ1 = lat1 * Math.PI / 180;
@@ -468,6 +758,92 @@
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
             return R * c;
+        }
+
+        function applySmoothedLocation(position) {
+            const lat = Number(position.coords.latitude);
+            const lon = Number(position.coords.longitude);
+            const accuracy = Number(position.coords.accuracy ?? 9999);
+            if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+                return;
+            }
+
+            const now = Date.now();
+            const posAge = position.timestamp ? now - Number(position.timestamp) : 0;
+            const last = lastStableFix || geoHistory[geoHistory.length - 1] || null;
+
+            if (posAge > GEO_MAX_POSITION_AGE_MS && last) {
+                console.log('Mengabaikan titik lokasi lama, menunggu pembaruan yang lebih baru');
+                geoState.latitude = last.latitude;
+                geoState.longitude = last.longitude;
+                geoState.accuracy = last.accuracy ?? accuracy;
+                return;
+            }
+
+            if (accuracy > MAX_ACCEPTABLE_ACCURACY && last) {
+                // terlalu tidak akurat, abaikan bila kita sudah punya titik
+                updateLocationStatusUI('Akurasi GPS rendah, memakai lokasi sebelumnya.', true);
+                geoState.latitude = last.latitude;
+                geoState.longitude = last.longitude;
+                geoState.accuracy = last.accuracy ?? accuracy;
+                return;
+            }
+
+            if (last) {
+                const jump = calculateDistanceMeters(lat, lon, last.latitude, last.longitude);
+                const notBetterAccuracy = accuracy >= (last.accuracy ?? accuracy) - GEO_ACCURACY_IMPROVEMENT_MARGIN;
+
+                // Abaikan jitter kecil bila akurasi tidak membaik
+                if (jump < GEO_MIN_MOVEMENT_METERS && notBetterAccuracy) {
+                    geoState.latitude = last.latitude;
+                    geoState.longitude = last.longitude;
+                    geoState.accuracy = Math.min(last.accuracy ?? accuracy, accuracy);
+                    if (lokasiInput && Number.isFinite(geoState.latitude) && Number.isFinite(geoState.longitude)) {
+                        lokasiInput.value = `${geoState.latitude},${geoState.longitude}`;
+                    }
+                    return;
+                }
+
+                if (jump > MAX_JUMP_METERS && accuracy >= (last.accuracy ?? accuracy)) {
+                    // lompat besar dengan akurasi tidak lebih baik, abaikan
+                    return;
+                }
+            }
+
+            geoHistory.push({ latitude: lat, longitude: lon, accuracy });
+            if (geoHistory.length > GEO_SMOOTH_HISTORY) geoHistory.shift();
+
+            // Weighted average dengan bobot kebalikan akurasi
+            let sumLat = 0;
+            let sumLon = 0;
+            let sumW = 0;
+            geoHistory.forEach((p) => {
+                const w = 1 / Math.max(p.accuracy || 1, 1);
+                sumLat += p.latitude * w;
+                sumLon += p.longitude * w;
+                sumW += w;
+            });
+            if (sumW === 0) {
+                geoState.latitude = lat;
+                geoState.longitude = lon;
+            } else {
+                geoState.latitude = sumLat / sumW;
+                geoState.longitude = sumLon / sumW;
+            }
+            geoState.accuracy = accuracy;
+
+            if (!lastStableFix || accuracy + GEO_ACCURACY_IMPROVEMENT_MARGIN < (lastStableFix.accuracy ?? Infinity) || accuracy <= GEO_STABLE_ACCURACY) {
+                lastStableFix = {
+                    latitude: geoState.latitude,
+                    longitude: geoState.longitude,
+                    accuracy,
+                    ts: now
+                };
+            }
+
+            if (lokasiInput && Number.isFinite(geoState.latitude) && Number.isFinite(geoState.longitude)) {
+                lokasiInput.value = `${geoState.latitude},${geoState.longitude}`;
+            }
         }
 
         function promptOutsideRadiusModal(distance, radius) {
@@ -515,8 +891,137 @@
             });
         }
 
+        function getOfficeLatLng() {
+            if (!EMPLOYEE_LOCATION) return { lat: null, lng: null };
+            const lat = Number(EMPLOYEE_LOCATION.latitude);
+            const lng = Number(EMPLOYEE_LOCATION.longitude);
+            return {
+                lat: isNaN(lat) ? null : lat,
+                lng: isNaN(lng) ? null : lng
+            };
+        }
+
+        function initPresenceMap() {
+            if (MAP_DISABLED) return;
+            if (presenceMap || !EMPLOYEE_LOCATION) return;
+            if (typeof L === 'undefined') return;
+            const mapEl = document.getElementById('presence-map');
+            const { lat, lng } = getOfficeLatLng();
+            if (!mapEl || lat === null || lng === null) return;
+
+            presenceMap = L.map(mapEl).setView([lat, lng], 16);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(presenceMap);
+
+            officeMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'custom-office-marker',
+                    html: '<div style="background:#2563eb;color:#fff;padding:6px 10px;border-radius:10px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,0.25);">Kantor</div>',
+                    iconSize: [60, 32],
+                    iconAnchor: [30, 32]
+                })
+            }).addTo(presenceMap);
+
+            const radiusVal = Number(EMPLOYEE_LOCATION.radius || 0);
+            if (!isNaN(radiusVal) && radiusVal > 0) {
+                radiusCircle = L.circle([lat, lng], {
+                    color: '#2563eb',
+                    fillColor: '#60a5fa',
+                    fillOpacity: 0.25,
+                    radius: radiusVal
+                }).addTo(presenceMap);
+            }
+        }
+
+        function updatePresenceMapWithUser() {
+            if (MAP_DISABLED) return;
+            initPresenceMap();
+            if (!presenceMap) return;
+            const { latitude, longitude } = geoState;
+            const { lat: officeLat, lng: officeLng } = getOfficeLatLng();
+            if (latitude === null || longitude === null) return;
+
+            if (!userMarker) {
+                userMarker = L.marker([latitude, longitude], {
+                    icon: L.divIcon({
+                        className: 'custom-user-marker',
+                        html: '<div style="background:#10b981;color:#fff;padding:6px 10px;border-radius:10px;font-weight:700;box-shadow:0 4px 12px rgba(0,0,0,0.25);">Anda</div>',
+                        iconSize: [60, 32],
+                        iconAnchor: [30, 32]
+                    })
+                }).addTo(presenceMap);
+            } else {
+                userMarker.setLatLng([latitude, longitude]);
+            }
+
+            if (officeLat !== null && officeLng !== null) {
+                const bounds = L.latLngBounds([
+                    [latitude, longitude],
+                    [officeLat, officeLng]
+                ]);
+                presenceMap.fitBounds(bounds, { padding: [40, 40] });
+            } else {
+                presenceMap.setView([latitude, longitude], 16);
+            }
+        }
+
+        function loadCachedGeoLocation() {
+            try {
+                const raw = sessionStorage.getItem('employeeLastGeo');
+                if (!raw) return;
+                const cached = JSON.parse(raw);
+                if (!cached || typeof cached !== 'object') return;
+                const age = Date.now() - Number(cached.ts || 0);
+                if (isNaN(age) || age > LOCATION_CACHE_MAX_AGE_MS) return;
+
+                geoState.latitude = Number(cached.latitude ?? null);
+                geoState.longitude = Number(cached.longitude ?? null);
+                geoState.accuracy = cached.accuracy != null ? Number(cached.accuracy) : null;
+                if (isFinite(geoState.latitude) && isFinite(geoState.longitude)) {
+                    geoHistory.push({
+                        latitude: geoState.latitude,
+                        longitude: geoState.longitude,
+                        accuracy: geoState.accuracy ?? MAX_ACCEPTABLE_ACCURACY
+                    });
+                    if (geoHistory.length > GEO_SMOOTH_HISTORY) geoHistory.shift();
+                    lastStableFix = {
+                        latitude: geoState.latitude,
+                        longitude: geoState.longitude,
+                        accuracy: geoState.accuracy ?? MAX_ACCEPTABLE_ACCURACY,
+                        ts: Date.now() - age
+                    };
+                    if (lokasiInput) {
+                        lokasiInput.value = `${geoState.latitude},${geoState.longitude}`;
+                    }
+                    validateEmployeeLocation();
+                    updatePresenceMapWithUser();
+                    updateLocationStatusUI();
+                    if (locationValidation.ready) {
+                        setLocationLoadingState(false);
+                        applyButtonIdleState();
+                    }
+                } else if (USE_DASHBOARD_GPS) {
+                    setLocationLoadingState(true, 'Lokasi dashboard belum tersedia, buka dashboard untuk memperbarui GPS.');
+                }
+            } catch (e) {
+                console.warn('Gagal memuat cache lokasi:', e);
+            }
+        }
+
         async function init() {
-            await ensureFaceAPI(); 
+            try {
+                await ensureFaceAPI();
+            } catch (e) {
+                console.error('FaceAPI gagal dimuat:', e);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal Memuat FaceAPI',
+                    text: e?.message || 'Library face-api.min.js tidak bisa diunduh. Periksa koneksi atau pastikan CDN diperbolehkan.',
+                });
+                return;
+            }
             try {
                 const makeDescriptor = (val) => new Array(128).fill(val);
                 const testDist = faceapi.euclideanDistance(makeDescriptor(0.12), makeDescriptor(0.14));
@@ -537,15 +1042,15 @@
             });
 
             try {
-                // Jalan paralel: Start Camera + Load Models + Get Embeddings
+                
                 const cameraPromise = startCamera(); 
-                const modelsPromise = loadFaceModels();
+                const modelsPromise = Promise.all([loadDetectionModels(), loadRecognitionModel()]);
                 const embeddingPromise = getReferenceEmbedding();
 
-                // Tunggu semua selesai
+                
                 await Promise.all([cameraPromise, modelsPromise, embeddingPromise]);
 
-                Swal.close(); // Tutup loading saat semua siap
+                Swal.close();
                 tryInitAttendanceButton(document.querySelector('.camera-capture video'));
                 
             } catch (error) {
@@ -560,27 +1065,68 @@
 
         function ensureFaceAPI() {
             if (window.faceapi) return Promise.resolve();
-            return new Promise((ok, err) => {
-                const s = document.createElement("script");
-                s.src = "{{ asset('assets/js/face-api.min.js') }}";
-                s.onload = ok;
-                s.onerror = err;
-                document.head.appendChild(s);
+            if (faceApiScriptPromise) return faceApiScriptPromise;
+
+            const CDN_FALLBACK = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+            const assetPath = "/assets/js/face-api.min.js";
+            const bladeUrl = "{{ asset('assets/js/face-api.min.js') }}";
+            const originUrl = `${window.location.origin}${assetPath}`;
+            const normalizeProtocol = (url) => {
+                if (!url) return null;
+                if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+                    return url.replace('http://', 'https://');
+                }
+                return url;
+            };
+            const candidates = Array.from(
+                new Set([bladeUrl, originUrl, CDN_FALLBACK].map(normalizeProtocol).filter(Boolean))
+            );
+
+            faceApiScriptPromise = new Promise((resolve, reject) => {
+                const tryLoad = (idx = 0) => {
+                    if (idx >= candidates.length) {
+                        reject(new Error('FaceAPI tidak bisa dimuat (lokal & CDN gagal).'));
+                        return;
+                    }
+                    const url = candidates[idx];
+                    const s = document.createElement("script");
+                    s.src = url;
+                    s.onload = resolve;
+                    s.onerror = (event) => {
+                        console.warn('Gagal memuat face-api dari', url, event);
+                        s.remove();
+                        tryLoad(idx + 1);
+                    };
+                    document.head.appendChild(s);
+                };
+                tryLoad();
             });
+            return faceApiScriptPromise;
         }
 
         function getMtcnnOptions() {
             return new faceapi.MtcnnOptions(MTCNN_OPTIONS);
         }
 
-        async function loadFaceModels() {
-            const MODEL_URL = '/models';
-            // Load models in parallel for speed
-            await Promise.all([
-                faceapi.nets.mtcnn.loadFromUri(MODEL_URL),
-                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+        async function loadDetectionModels() {
+            if (faceapi.nets?.mtcnn?.isLoaded && faceapi.nets?.faceLandmark68Net?.isLoaded) {
+                return;
+            }
+            if (faceModelPromise) return faceModelPromise;
+            faceModelPromise = Promise.all([
+                faceapi.loadMtcnnModel(FACE_MODEL_BASE_URL),
+                faceapi.loadFaceLandmarkModel(FACE_MODEL_BASE_URL),
             ]);
+            return faceModelPromise;
+        }
+
+        async function loadRecognitionModel() {
+            if (faceapi.nets?.faceRecognitionNet?.isLoaded) {
+                return;
+            }
+            if (recognitionModelPromise) return recognitionModelPromise;
+            recognitionModelPromise = faceapi.loadFaceRecognitionModel(FACE_MODEL_BASE_URL);
+            return recognitionModelPromise;
         }
 
         async function getReferenceEmbedding() {
@@ -797,23 +1343,35 @@
                     return;
                 }
 
-                forceVideoFill(video);
-                const overlay = ensureOverlay(wrap);
-                const sync = () => syncCanvasToBox(overlay, wrap);
-                sync();
-                new ResizeObserver(sync).observe(wrap);
+                const setupAndRun = async () => {
+                    try {
+                        await loadDetectionModels(); // pastikan model deteksi terunduh sebelum deteksi
+                    } catch (e) {
+                        console.error('Gagal memuat model face-api:', e);
+                        Swal.fire('Error', 'Model deteksi wajah gagal dimuat. Muat ulang halaman.', 'error');
+                        return;
+                    }
 
-                const displayName =
-                    @json(optional(optional($user)->employee)->nama ?? (optional(optional($user)->employee)->nik ?? 'Tidak dikenali'));
-                tryInitAttendanceButton(video);
-                if (video.readyState >= 2) {
-                    runDetect(video, overlay, wrap, displayName);
-                } else {
-                    video.addEventListener("loadedmetadata", () => runDetect(video, overlay, wrap,
-                    displayName), {
-                        once: true
-                    });
-                }
+                    forceVideoFill(video);
+                    const overlay = ensureOverlay(wrap);
+                    const sync = () => syncCanvasToBox(overlay, wrap);
+                    sync();
+                    new ResizeObserver(sync).observe(wrap);
+                    window.addEventListener('resize', sync);
+                    window.addEventListener('orientationchange', sync);
+
+                    const displayName =
+                        @json(optional(optional($user)->employee)->nama ?? (optional(optional($user)->employee)->nik ?? 'Tidak dikenali'));
+                    tryInitAttendanceButton(video);
+                    const runWithReady = () => runDetect(video, overlay, wrap, displayName);
+                    if (video.readyState >= 2) {
+                        runWithReady();
+                    } else {
+                        video.addEventListener("loadedmetadata", runWithReady, { once: true });
+                    }
+                };
+
+                setupAndRun();
             });
 
             Webcam.on("error", (err) => {
@@ -837,6 +1395,17 @@
                     requestAnimationFrame(loop);
                     return;
                 }
+                const now = performance.now();
+                if (now - lastDetectAt < DETECTION_INTERVAL_MS) {
+                    requestAnimationFrame(loop);
+                    return;
+                }
+                lastDetectAt = now;
+                if (!faceapi?.nets?.mtcnn?.isLoaded || !faceapi?.nets?.faceLandmark68Net?.isLoaded || !faceapi?.nets?.faceRecognitionNet?.isLoaded) {
+                    // Model belum siap, tunggu frame berikutnya
+                    requestAnimationFrame(loop);
+                    return;
+                }
 
                 // Cek status presensi sebelum melakukan deteksi
                 const actionMode = getCurrentActionMode();
@@ -846,24 +1415,27 @@
                      return;
                 }
 
-                // Cek lokasi
-                if (!EMPLOYEE_LOCATION || !locationValidation.ready || !locationValidation.isInsideRadius) {
-                     updateStatusIndicatorForLocation();
-                     requestAnimationFrame(loop);
-                     return;
-                }
-
-                const drawSize = {
-                    width: box.clientWidth,
-                    height: box.clientHeight
-                };
+                const drawSize = (() => {
+                    const rect = video.getBoundingClientRect();
+                    const w = Math.round(rect.width || video.clientWidth || box.clientWidth);
+                    const h = Math.round(rect.height || video.clientHeight || box.clientHeight);
+                    return { width: w, height: h };
+                })();
 
                 try {
+                    // Pastikan kanvas tetap mengikuti ukuran container (tampilan responsif)
+                    const expectedW = Math.round(box.clientWidth);
+                    const expectedH = Math.round(box.clientHeight);
+                    const currentW = Math.round(canvas.style.width ? parseFloat(canvas.style.width) : 0);
+                    const currentH = Math.round(canvas.style.height ? parseFloat(canvas.style.height) : 0);
+                    if (expectedW !== currentW || expectedH !== currentH) {
+                        syncCanvasToBox(canvas, box);
+                    }
+
                     const detections = await faceapi
                         .detectAllFaces(video, opts)
                         .withFaceLandmarks()
                         .withFaceDescriptors();
-                    const resizedResults = faceapi.resizeResults(detections, drawSize);
 
                     ctx.setTransform(1, 0, 0, 1, 0, 0);
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -873,25 +1445,35 @@
                     ctx.font = '12px "Inter", sans-serif';
                     let recognizedFaces = 0;
                     
-                    resizedResults.forEach((result) => {
-                        const box = result.detection.box;
-                        const drawX = box.x;
-                        ctx.beginPath();
-                        ctx.lineWidth = 2;
-                        ctx.strokeStyle = '#38bdf8';
-                        ctx.rect(drawX, box.y, box.width, box.height);
-                        ctx.stroke();
+                    const overlayMirrored = VIDEO_MIRRORED === true; // samakan orientasi overlay dengan tampilan video yang sudah mirror
 
-                        let label = 'Tidak dikenali';
-                        let isMatch = false;
-                        if (result.descriptor && referenceEmbeddings.length) {
-                            const bestMatch = findBestReferenceDistance(result.descriptor);
-                            if (bestMatch.distance < FACE_VERIFICATION_THRESHOLD) {
-                                label = displayName;
-                                recognizedFaces++;
-                                isMatch = true;
-                            }
+                    detections.forEach((result) => {
+                        const box = projectDetectionBox(
+                            result.detection.box,
+                            drawSize.width,
+                            drawSize.height,
+                            video.videoWidth,
+                            video.videoHeight,
+                            overlayMirrored
+                        );
+                    if (!box) return;
+                    const drawX = box.x;
+                    ctx.beginPath();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#38bdf8';
+                    ctx.rect(drawX, box.y, box.width, box.height);
+                    ctx.stroke();
+
+                    let label = 'Tidak dikenali';
+                    let isMatch = false;
+                    if (result.descriptor && referenceEmbeddings.length) {
+                        const bestMatch = findBestReferenceDistance(result.descriptor);
+                        if (bestMatch.distance < FACE_MATCH_LIMIT) {
+                            label = displayName;
+                            recognizedFaces++;
+                            isMatch = true;
                         }
+                    }
 
                         const padding = 4;
                         const textWidth = ctx.measureText(label).width;
@@ -905,28 +1487,27 @@
                         ctx.fillStyle = isMatch ? 'rgba(14, 165, 233, 0.8)' : 'rgba(239, 68, 68, 0.8)';
                         ctx.strokeStyle = isMatch ? '#38bdf8' : '#ef4444';
 
-                        ctx.save();
-                        if (VIDEO_MIRRORED) {
+                        ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
+                        ctx.fillStyle = 'white';
+                        if (NAME_MIRRORED) {
+                            ctx.save();
+                            ctx.translate(rectX + rectWidth / 2, 0);
                             ctx.scale(-1, 1);
-                            ctx.fillRect(-(rectX + rectWidth), rectY, rectWidth, rectHeight);
-                            ctx.fillStyle = 'white';
-                            ctx.fillText(label, -(rectX + rectWidth) + padding, textY);
+                            ctx.fillText(label, -(rectWidth / 2) + padding, textY);
+                            ctx.restore();
                         } else {
-                            ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
-                            ctx.fillStyle = 'white';
                             ctx.fillText(label, rectX + padding, textY);
                         }
-                        ctx.restore();
                     });
 
                     // Hanya tampilkan status; proses presensi dijalankan via tombol manual
-                    if (recognizedFaces === 1 && resizedResults.length === 1) {
+                    if (recognizedFaces === 1 && detections.length === 1) {
                         setDetectionState('ready');
                         updateStatusIndicator('Wajah Dikenali', 'Tekan tombol presensi untuk melanjutkan.', 'primary');
-                    } else if (resizedResults.length > 1) {
+                    } else if (detections.length > 1) {
                         setDetectionState('multiple');
                         updateStatusIndicator('Terlalu Banyak Wajah', 'Pastikan hanya satu wajah di kamera.', 'warning');
-                    } else if (resizedResults.length === 1 && recognizedFaces === 0) {
+                    } else if (detections.length === 1 && recognizedFaces === 0) {
                         setDetectionState('unknown');
                         updateStatusIndicator('Wajah Tidak Dikenali', 'Coba posisikan wajah lebih jelas.', 'danger');
                     } else {
@@ -947,6 +1528,7 @@
             if (isVerifying) return;
             isVerifying = true;
 
+            await loadRecognitionModel();
             const mtcnnOptions = getMtcnnOptions();
 
             try {
@@ -973,9 +1555,9 @@
                 const distanceResults = collectedDescriptors.map(descriptor => findBestReferenceDistance(descriptor));
                 const distances = distanceResults.map(result => result.distance);
                 const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
-                const matchCount = distances.filter(d => d < FACE_VERIFICATION_THRESHOLD).length;
+                const matchCount = distances.filter(d => d < FACE_MATCH_LIMIT).length;
 
-                if (matchCount >= REQUIRED_MATCHES && avgDistance < FACE_VERIFICATION_THRESHOLD + FACE_VERIFICATION_MARGIN) {
+                if (matchCount >= REQUIRED_MATCHES && avgDistance < FACE_MATCH_LIMIT) {
                     updateStatusIndicator('Verifikasi Berhasil!', 'Mengirim data presensi...', 'success', true);
                     const snapshotData = takeSnapshot(video);
                     await sendPresenceRequest(csrfToken, snapshotData);
@@ -1122,13 +1704,7 @@
                 }
 
                 if (!locationValidation.ready) {
-                    Swal.fire('Menunggu Lokasi', 'Sistem masih membaca lokasi perangkat Anda.', 'info');
-                    resetButton();
-                    return;
-                }
-
-                if (!locationValidation.isInsideRadius) {
-                    promptOutsideRadiusModal(locationValidation.distanceMeters || 0, Number(EMPLOYEE_LOCATION.radius || 0));
+                    Swal.fire('Menunggu Lokasi', 'Sistem sedang membaca koordinat perangkat Anda.', 'info');
                     resetButton();
                     return;
                 }
@@ -1140,7 +1716,7 @@
                 }
 
                 if (isVerifying) {
-                    console.log('�?� Sedang memverifikasi, abaikan klik');
+                    console.log('Sedang memverifikasi, abaikan klik ganda');
                     return;
                 }
 
@@ -1148,7 +1724,7 @@
                 button.disabled = true;
                 setButtonLoadingState('Memverifikasi...');
 
-                console.log('�Y"? Memulai proses verifikasi...');
+                console.log('Memulai proses verifikasi...');
 
                 Swal.fire({
                     title: 'Mencoba melakukan presensi...',
@@ -1161,6 +1737,7 @@
                 const mtcnnOptions = getMtcnnOptions();
 
                 try {
+                    await loadRecognitionModel();
                     const collectedDescriptors = [];
                     let attempt = 0;
                     console.log('📸 Mengambil beberapa sampel wajah untuk verifikasi...');
@@ -1191,15 +1768,14 @@
                     const distances = distanceResults.map(result => result.distance);
                     const minDistance = Math.min(...distances);
                     const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
-                    const matchCount = distances.filter(d => d < FACE_VERIFICATION_THRESHOLD).length;
+                    const matchCount = distances.filter(d => d < FACE_MATCH_LIMIT).length;
 
                     console.log(`📏 Sampel jarak: ${distances.map(d => d.toFixed(4)).join(', ')}`);
                     console.log(
                         `✅ Minimum: ${minDistance.toFixed(4)}, Rata-rata: ${avgDistance.toFixed(4)}, Cocok: ${matchCount}`
                     );
 
-                    if (matchCount >= REQUIRED_MATCHES && avgDistance < FACE_VERIFICATION_THRESHOLD +
-                        FACE_VERIFICATION_MARGIN) {
+                    if (matchCount >= REQUIRED_MATCHES && avgDistance < FACE_MATCH_LIMIT) {
                         console.log('✅ Verifikasi berhasil! Wajah cocok.');
                         Swal.update({
                             title: 'Verifikasi Berhasil!',
@@ -1260,12 +1836,6 @@
                 return;
             }
 
-            if (!locationValidation.ready || !locationValidation.isInsideRadius) {
-                Swal.fire('Di Luar Radius', 'Anda berada di luar radius lokasi atau lokasi belum terbaca.', 'error');
-                resetButton();
-                return;
-            }
-
             if (geoState.latitude === null || geoState.longitude === null) {
                 Swal.fire('Lokasi Tidak Terbaca', 'Aktifkan GPS untuk melanjutkan.', 'error');
                 resetButton();
@@ -1314,33 +1884,16 @@
                 const isLate = statusLabel === 'Terlambat';
                 const shiftInfo = data.shift || {};
                 const actionType = data.action || 'clock_in';
-                const modalDetails = [
-                    `<p><strong>Status:</strong> ${statusLabel}</p>`,
-                    `<p><strong>Jam Shift:</strong> ${shiftInfo.jam_masuk || '-'}</p>`,
-                    `<p><strong>Jam Presensi:</strong> ${recordedTime || '-'}</p>`
-                ];
-                if (isLate) {
-                    modalDetails.push(`
-                        <div class="alert alert-warning mt-2" role="alert">
-                            Anda tercatat terlambat. Segera informasikan kepada atasan jika diperlukan.
-                        </div>
-                    `);
-                }
                 const radiusLimit = EMPLOYEE_LOCATION ? Number(EMPLOYEE_LOCATION.radius || 0) : null;
-                if (locationValidation.distanceMeters !== null && radiusLimit !== null) {
-                    const distanceText = `${locationValidation.distanceMeters.toFixed(1)} m`;
-                    const radiusStatusText = locationValidation.isInsideRadius ? 'Dalam Radius' : 'Di Luar Radius';
-                    modalDetails.push(`<p><strong>Jarak ke Lokasi:</strong> ${distanceText}</p>`);
-                    modalDetails.push(`<p><strong>Radius Ditentukan:</strong> ${radiusLimit} m</p>`);
-                    modalDetails.push(`<p><strong>Status Radius:</strong> ${radiusStatusText}</p>`);
-                    if (!locationValidation.isInsideRadius && radiusLimit > 0 && locationValidation.distanceMeters > radiusLimit) {
-                        modalDetails.push(`
-                            <div class="alert alert-danger mt-2" role="alert">
-                                Sistem mendeteksi Anda di luar radius lokasi. Dekati titik kantor untuk presensi berikutnya.
-                            </div>
-                        `);
-                    }
-                }
+                const distanceText = locationValidation.distanceMeters !== null
+                    ? `${locationValidation.distanceMeters.toFixed(1)} m`
+                    : '-';
+                const radiusStatusText = locationValidation.isInsideRadius ? 'Dalam Radius' : 'Di Luar Radius';
+                const modalDetails = [
+                    `<p class="mb-1"><strong>Status:</strong> ${statusLabel}</p>`,
+                    `<p class="mb-1"><strong>Status Radius:</strong> ${radiusStatusText}</p>`,
+                    `<p class="mb-1"><strong>Jarak ke Lokasi:</strong> ${distanceText}</p>`,
+                ];
                 Swal.fire({
                     icon: isLate ? 'warning' : 'success',
                     title: actionType === 'clock_out'
@@ -1349,7 +1902,11 @@
                     html: `<div class="text-start">${modalDetails.join('')}</div>`,
                     allowOutsideClick: false,
                     showConfirmButton: true,
-                    confirmButtonText: 'Ok'
+                    confirmButtonText: 'Ok',
+                    customClass: {
+                        popup: 'swal-presence-popup',
+                        confirmButton: 'swal-presence-confirm'
+                    }
                 }).then((result) => {
                     if (result.isConfirmed) {
                         window.location.href = "{{ route('employee.index') }}";
@@ -1537,6 +2094,35 @@
             canvas.height = Math.max(1, h * dpr);
             const ctx = canvas.getContext("2d");
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        }
+
+        function projectDetectionBox(detBox, containerW, containerH, videoW, videoH, mirrored = false) {
+            if (!detBox || !containerW || !containerH || !videoW || !videoH) return null;
+
+            // object-fit: cover mapping agar overlay sejajar di mobile maupun desktop
+            const scale = Math.max(containerW / videoW, containerH / videoH);
+            const displayW = videoW * scale;
+            const displayH = videoH * scale;
+            const offsetX = (displayW - containerW) / 2;
+            const offsetY = (displayH - containerH) / 2;
+
+            const xRaw = detBox.x * scale - offsetX;
+            const yRaw = detBox.y * scale - offsetY;
+            const width = detBox.width * scale;
+            const height = detBox.height * scale;
+
+            let x = xRaw;
+            if (mirrored) {
+                x = containerW - (xRaw + width);
+            }
+
+            // clamp supaya box tidak keluar area canvas
+            return {
+                x: Math.min(Math.max(0, x), containerW - width),
+                y: Math.min(Math.max(0, yRaw), containerH - height),
+                width,
+                height
+            };
         }
     </script>
 

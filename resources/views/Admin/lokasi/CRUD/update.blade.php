@@ -127,6 +127,9 @@
             const latInput = document.getElementById('latitude');
             const lngInput = document.getElementById('longitude');
             const radiusInput = document.getElementById('radius');
+            const statusEl = document.getElementById('locationStatus');
+            const GEO_OPTIONS_FAST = { enableHighAccuracy: false, maximumAge: 30000, timeout: 12000 };
+            const GEO_OPTIONS_PRECISE = { enableHighAccuracy: true, maximumAge: 20000, timeout: 20000 };
             
             // Default location (Jakarta) if no data
             let defaultLat = -6.2088;
@@ -220,7 +223,7 @@
                         }
                     }, function(error) {
                         console.warn("Geolocation error:", error);
-                    });
+                    }, GEO_OPTIONS_FAST);
                 }
             }
 
@@ -228,35 +231,50 @@
             const useLocationBtn = document.getElementById('useCurrentLocation');
             if (useLocationBtn) {
                 useLocationBtn.addEventListener('click', function() {
-                    if (navigator.geolocation) {
-                        locationStatus.textContent = 'Mendapatkan lokasi...';
-                        locationStatus.className = 'form-text mt-1 mb-3 text-info';
+                    if (!navigator.geolocation) {
+                        statusEl.textContent = 'Browser tidak mendukung geolocation.';
+                        statusEl.className = 'form-text mt-1 mb-3 text-danger';
+                        return;
+                    }
+                    statusEl.textContent = 'Meminta lokasi Anda...';
+                    statusEl.className = 'form-text mt-1 mb-3 text-warning';
+
+                    navigator.geolocation.getCurrentPosition(onSuccess, onErrorFast, GEO_OPTIONS_FAST);
+
+                    function onSuccess(position) {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
                         
-                        navigator.geolocation.getCurrentPosition(function(position) {
-                            const lat = position.coords.latitude;
-                            const lng = position.coords.longitude;
-                            
-                            updateInputs(lat, lng);
-                            const newLatLng = new L.LatLng(lat, lng);
-                            marker.setLatLng(newLatLng);
-                            circle.setLatLng(newLatLng);
-                            map.setView(newLatLng, 18);
-                            
-                            locationStatus.textContent = 'Lokasi berhasil diperbarui ke posisi Anda saat ini.';
-                            locationStatus.className = 'form-text mt-1 mb-3 text-success';
-                        }, function(error) {
-                            let msg = 'Gagal mendapatkan lokasi.';
-                            switch(error.code) {
-                                case error.PERMISSION_DENIED: msg = "Izin lokasi ditolak."; break;
-                                case error.POSITION_UNAVAILABLE: msg = "Informasi lokasi tidak tersedia."; break;
-                                case error.TIMEOUT: msg = "Waktu permintaan habis."; break;
-                            }
-                            locationStatus.textContent = msg;
-                            locationStatus.className = 'form-text mt-1 mb-3 text-danger';
-                        });
-                    } else {
-                        locationStatus.textContent = 'Browser tidak mendukung geolocation.';
-                        locationStatus.className = 'form-text mt-1 mb-3 text-danger';
+                        updateInputs(lat, lng);
+                        const newLatLng = new L.LatLng(lat, lng);
+                        marker.setLatLng(newLatLng);
+                        circle.setLatLng(newLatLng);
+                        map.setView(newLatLng, 18);
+                        
+                        statusEl.textContent = 'Lokasi berhasil diperbarui ke posisi Anda saat ini.';
+                        statusEl.className = 'form-text mt-1 mb-3 text-success';
+                    }
+
+                    function onErrorFast(error) {
+                        if (error.code === error.PERMISSION_DENIED) {
+                            statusEl.textContent = 'Izin lokasi ditolak.';
+                            statusEl.className = 'form-text mt-1 mb-3 text-danger';
+                            return;
+                        }
+                        statusEl.textContent = 'Mencoba ulang dengan akurasi tinggi...';
+                        statusEl.className = 'form-text mt-1 mb-3 text-warning';
+                        navigator.geolocation.getCurrentPosition(onSuccess, onErrorFinal, GEO_OPTIONS_PRECISE);
+                    }
+
+                    function onErrorFinal(error) {
+                        let msg = 'Gagal mendapatkan lokasi.';
+                        switch(error.code) {
+                            case error.PERMISSION_DENIED: msg = "Izin lokasi ditolak."; break;
+                            case error.POSITION_UNAVAILABLE: msg = "Informasi lokasi tidak tersedia."; break;
+                            case error.TIMEOUT: msg = "Waktu permintaan habis."; break;
+                        }
+                        statusEl.textContent = msg;
+                        statusEl.className = 'form-text mt-1 mb-3 text-danger';
                     }
                 });
             }

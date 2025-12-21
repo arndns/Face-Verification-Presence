@@ -25,7 +25,7 @@
                                     <th>Nama Shift</th>
                                     <th>Jam Masuk</th>
                                     <th>Jam Pulang</th>
-                                    <th>Aksi</th>
+                                    <th class="text-center" style="width: 20%;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -36,14 +36,18 @@
                                         <td>{{ $shift->jam_masuk }}</td>
                                         <td>{{ $shift->jam_pulang }}</td>
                                         <td>
-                                            <div class="d-flex gap-2">
+                                            <div class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
                                                 <a href="{{ route('shifts.edit', $shift) }}"
-                                                    class="btn btn-sm btn-warning">Edit</a>
+                                                    class="btn btn-sm btn-warning text-white" title="Lihat Detail">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
                                                 <form action="{{ route('shifts.destroy', $shift) }}" method="POST"
                                                     onsubmit="return confirm('Hapus shift ini?');">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <button class="btn btn-sm btn-danger" type="submit">Hapus</button>
+                                                    <button class="btn btn-sm btn-danger" type="submit" title="Hapus">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
                                                 </form>
                                             </div>
                                         </td>

@@ -62,6 +62,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/admin/permit/{permit}/approve', [AdminController::class, 'approvePermit'])->name('admin.permit.approve');
         Route::post('/admin/permit/{permit}/reject', [AdminController::class, 'rejectPermit'])->name('admin.permit.reject');
         Route::put('/admin/permit/{permit}/update', [AdminController::class, 'updatePermit'])->name('admin.permit.update');
+        Route::delete('/admin/permit/{permit}', [AdminController::class, 'destroyPermit'])->name('admin.permit.destroy');
     });
 
     Route::middleware('role:employee')->group(function () {
@@ -73,6 +74,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/employee/permit/create', [EmployeeController::class, 'createPermit'])->name('employee.permit.create');
         Route::post('/employee/leave/store', [EmployeeController::class, 'storePermit'])->name('employee.permit.store');
         Route::get('/employee/leave/history', [EmployeeController::class, 'permitHistory'])->name('employee.permit.history');
+        Route::delete('/employee/leave/{permit}', [EmployeeController::class, 'destroyPermit'])->name('employee.permit.destroy');
         Route::get('/employee/profile', [EmployeeController::class, 'profile'])->name('employee.profile');
         Route::post('/employee/profile/password', [EmployeeController::class, 'updatePassword'])->name('employee.update.password');
     });

@@ -110,7 +110,7 @@
                         Sedang Izin/Cuti
                     </button>
                 @else
-                    <a href="{{ route('employee.camera') }}" class="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center" id="main-presence-btn">
+                    <a href="{{ route('employee.camera') }}" class="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center" id="main-presence-btn" data-presence-nav>
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-2">
                             <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
                             <path d="M21 8V5a2 2 0 0 0-2-2h-3"></path>
@@ -140,7 +140,7 @@
                             <i class="fa-solid fa-location-crosshairs"></i> Periksa Lokasi Saya
                         </button>
                     </div>
-                    <div id="location-map" class="location-map" style="display: none;">
+                    <div id="location-map" class="location-map is-hidden">
                         <div id="map-container"></div>
                     </div>
                 @else
@@ -262,6 +262,26 @@
 @endsection
 
 @section('script')
+    <style>
+        .location-map {
+            position: relative;
+            width: 100%;
+            min-height: 260px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #f8fafc;
+            opacity: 1;
+            transition: opacity 0.25s ease;
+        }
+        .location-map.is-hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #map-container {
+            position: absolute;
+            inset: 0;
+        }
+    </style>
     <script>
         // Real-time Server Clock
         (function() {
@@ -353,17 +373,32 @@
                 navigator.geolocation.getCurrentPosition((position) => {
                     const {
                         latitude,
-                        longitude
+                        longitude,
+                        accuracy
                     } = position.coords;
                     const distance = calculateDistance(latitude, longitude, officeLat, officeLon);
 
                     statusText.textContent = `Posisi Anda ${distance.toFixed(0)} m dari kantor.`;
                     
-                    const isInside = distance <= officeRadius;
+                    // Simpan cache lokasi untuk halaman presensi
+                    try {
+                        sessionStorage.setItem('employeeLastGeo', JSON.stringify({
+                            latitude,
+                            longitude,
+                            accuracy: accuracy ?? null,
+                            ts: Date.now()
+                        }));
+                        sessionStorage.removeItem('employeeGeoBlocked');
+                        document.body.classList.remove('presence-disabled');
+                    } catch (e) {
+                        console.warn('Gagal menyimpan cache lokasi:', e);
+                    }
+                    
+                const isInside = distance <= officeRadius;
 
-                    if (isInside) {
-                        statusText.classList.add('text-success-bold');
-                        statusText.classList.remove('text-danger-bold');
+                if (isInside) {
+                    statusText.classList.add('text-success-bold');
+                    statusText.classList.remove('text-danger-bold');
                         
                         // Enable buttons
                         if (mainBtn) {
@@ -374,36 +409,37 @@
                             mainBtn.href = cameraRoute;
                             mainBtn.querySelector('.btn-text').textContent = 'Mulai Presensi';
                         }
-                        if (bottomBtn) {
-                            bottomBtn.style.opacity = '1';
-                            bottomBtn.style.cursor = 'pointer';
-                            bottomBtn.style.pointerEvents = 'auto';
-                            bottomBtn.href = cameraRoute;
-                        }
+                    if (bottomBtn) {
+                        bottomBtn.style.opacity = '1';
+                        bottomBtn.style.cursor = 'pointer';
+                        bottomBtn.style.pointerEvents = 'auto';
+                        bottomBtn.href = cameraRoute;
+                    }
 
-                    } else {
-                        statusText.classList.add('text-danger-bold');
-                        statusText.classList.remove('text-success-bold');
-                        
-                        // Disable buttons
-                        if (mainBtn) {
-                            mainBtn.classList.add('disabled', 'btn-secondary');
-                            mainBtn.classList.remove('btn-primary');
-                            mainBtn.style.opacity = '0.6';
-                            mainBtn.style.cursor = 'not-allowed';
-                            mainBtn.removeAttribute('href');
-                            mainBtn.querySelector('.btn-text').textContent = 'Di Luar Jangkauan';
-                        }
-                        if (bottomBtn) {
-                            bottomBtn.style.opacity = '0.5';
-                            bottomBtn.style.cursor = 'not-allowed';
-                            bottomBtn.style.pointerEvents = 'none'; // Prevent clicks
-                            bottomBtn.removeAttribute('href');
+                } else {
+                    statusText.classList.add('text-danger-bold');
+                    statusText.classList.remove('text-success-bold');
+                    
+                    // Disable buttons (blokir akses kamera jika di luar radius)
+                    if (mainBtn) {
+                        mainBtn.classList.add('disabled', 'btn-secondary');
+                        mainBtn.classList.remove('btn-primary');
+                        mainBtn.style.opacity = '0.6';
+                        mainBtn.style.cursor = 'not-allowed';
+                        mainBtn.removeAttribute('href');
+                        mainBtn.querySelector('.btn-text').textContent = 'Di luar radius presensi';
+                    }
+                    if (bottomBtn) {
+                        bottomBtn.style.opacity = '0.5';
+                        bottomBtn.style.cursor = 'not-allowed';
+                        bottomBtn.style.pointerEvents = 'none'; // Prevent clicks
+                        bottomBtn.removeAttribute('href');
                         }
                     }
 
-                    // Show and initialize map
-                    mapContainer.style.display = 'block';
+                    // Show and initialize map without shifting layout
+                    mapContainer.classList.remove('is-hidden');
+                    mapContainer.classList.add('is-visible');
                     initMap();
 
                     // Update or create user marker
@@ -439,6 +475,14 @@
                     }
                     statusText.textContent = message;
                     statusText.classList.add('text-danger-bold');
+                    try {
+                        if (error.code === error.PERMISSION_DENIED) {
+                            sessionStorage.setItem('employeeGeoBlocked', '1');
+                            document.body.classList.add('presence-disabled');
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
                 }, {
                     enableHighAccuracy: true,
                     timeout: 10000
@@ -508,6 +552,44 @@
                     current_time: "{{ $presenceReminder['current_time'] ?? '--:--' }}"
                 };
 
+                const cameraUrl = "{{ route('employee.camera') }}";
+
+                function getOfficeAndCache() {
+                    const trigger = document.getElementById('check-location');
+                    if (!trigger) return null;
+                    const lat = parseFloat(trigger.dataset.lat || 'nan');
+                    const lon = parseFloat(trigger.dataset.lon || 'nan');
+                    const radius = parseFloat(trigger.dataset.radius || '0');
+                    if (!isFinite(lat) || !isFinite(lon)) return null;
+
+                    let cache = null;
+                    try {
+                        cache = JSON.parse(sessionStorage.getItem('employeeLastGeo') || 'null');
+                    } catch (e) {
+                        cache = null;
+                    }
+                    return { lat, lon, radius, cache };
+                }
+
+                function guardAndGo() {
+                    const data = getOfficeAndCache();
+                    if (!data || !data.cache || !isFinite(data.cache.latitude) || !isFinite(data.cache.longitude)) {
+                        Swal.fire('Lokasi Belum Terbaca', 'Periksa lokasi dulu sebelum membuka kamera.', 'warning');
+                        return;
+                    }
+                    const dist = calculateDistance(
+                        Number(data.cache.latitude),
+                        Number(data.cache.longitude),
+                        data.lat,
+                        data.lon
+                    );
+                    if (dist > data.radius && data.radius > 0) {
+                        Swal.fire('Di Luar Radius', 'Dekati lokasi presensi untuk membuka kamera.', 'warning');
+                        return;
+                    }
+                    window.location.href = cameraUrl;
+                }
+
                 Swal.fire({
                     icon: 'info',
                     title: 'Segera Lakukan Presensi Masuk',
@@ -524,7 +606,7 @@
                     cancelButtonText: 'Nanti',
                 }).then(result => {
                     if (result.isConfirmed) {
-                        window.location.href = "{{ route('employee.camera') }}";
+                        guardAndGo();
                     }
                 });
             })();

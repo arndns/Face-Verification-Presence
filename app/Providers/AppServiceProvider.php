@@ -28,6 +28,10 @@ class AppServiceProvider extends ServiceProvider
         });
 
         if (!$this->app->runningInConsole()) {
+            // Ensure generated URLs (asset, route) always use HTTPS in production to avoid mixed content
+            if (config('app.env') === 'production') {
+                URL::forceScheme('https');
+            }
             URL::forceRootUrl(request()->getSchemeAndHttpHost());
         }
 

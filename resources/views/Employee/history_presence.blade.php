@@ -1,12 +1,19 @@
 @extends('layout.employee')
 @section('title', 'history')
-@section('content')
-    <div class="p-3">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-            <div>
-                <h5 class="mb-0">Riwayat Presensi</h5>
-            </div>
+@section('header')
+    <div class="appHeader text-light p-3 d-flex align-items-center justify-content-between shadow-sm">
+        <div class="left">
+            <a href="{{ route('employee.index') }}" class="headerButton goBack text-light">
+                <i class="fas fa-chevron-left fa-lg"></i>
+            </a>
         </div>
+        <div class="pageTitle h5 mb-0">Riwayat Presensi</div>
+        <div class="right" style="width: 24px;"></div>
+    </div>
+@endsection
+
+@section('content')
+    <div class="p-3 pt-4">
 
         @if ($histories->isEmpty())
             <div class="text-center py-5 border rounded-3 bg-white shadow-sm">
@@ -43,6 +50,9 @@
                         </span>
                     </div>
                 @endforeach
+            </div>
+            <div class="mt-3" style="margin-bottom: 80px;">
+                {{ $histories->appends(request()->query())->links() }}
             </div>
             <div class="text-center py-4 text-muted d-none" id="history-empty">
                 Data belum ada untuk rentang ini.

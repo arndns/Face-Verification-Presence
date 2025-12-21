@@ -19,6 +19,12 @@
     <div class="container py-4">
         <div class="card shadow-sm">
             <div class="card-body">
+                @if(session('warning'))
+                    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                        <i class="fas fa-exclamation-triangle"></i> {{ session('warning') }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                @endif
                 <form action="{{ route('employee.permit.store') }}" method="POST">
                     @csrf
 
@@ -38,11 +44,18 @@
                     @php
                         $minPermitDate = date('Y-m-d', strtotime('+1 day'));
                     @endphp
+                    @php
+                        $today = date('Y-m-d');
+                        $initialMin = old('leave_type') === 'sakit' ? $today : $minPermitDate;
+                    @endphp
                     <div class="mb-3">
                         <label for="start_date" class="form-label">Tanggal Mulai <span class="text-danger">*</span></label>
                         <input type="date" class="form-control @error('start_date') is-invalid @enderror" 
                                id="start_date" name="start_date" value="{{ old('start_date') }}" 
-                               min="{{ $minPermitDate }}" required>
+                               min="{{ $initialMin }}"
+                               data-today="{{ $today }}"
+                               data-tomorrow="{{ $minPermitDate }}"
+                               required>
                         @error('start_date')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
@@ -96,19 +109,39 @@
 
 @section('script')
     <script>
-        // Sync end date with start date (H-1 rule already enforced via min attr)
-        const startInput = document.getElementById('start_date');
-        const endInput = document.getElementById('end_date');
+        // Aturan tanggal:
+        // - Sakit: boleh H (hari ini), min = today
+        // - Selain sakit: minimal H-1 sebelum mulai (tidak boleh hari ini), min = besok
+        (function() {
+            const leaveSelect = document.getElementById('leave_type');
+            const startInput = document.getElementById('start_date');
+            const endInput = document.getElementById('end_date');
+            if (!leaveSelect || !startInput || !endInput) return;
 
-        const enforceMinDate = () => {
-            const minDate = startInput.value || startInput.min;
-            endInput.min = minDate;
-            if (endInput.value < minDate) {
-                endInput.value = minDate;
-            }
-        };
+            const minToday = startInput.dataset.today;
+            const minTomorrow = startInput.dataset.tomorrow;
 
-        startInput.addEventListener('change', enforceMinDate);
-        enforceMinDate();
+            const enforceEndMin = () => {
+                const minDate = startInput.value || startInput.min;
+                endInput.min = minDate;
+                if (endInput.value && endInput.value < minDate) {
+                    endInput.value = minDate;
+                }
+            };
+
+            const applyLeaveMin = () => {
+                const isSick = leaveSelect.value === 'sakit';
+                const minDate = isSick ? minToday : minTomorrow;
+                startInput.min = minDate;
+                if (startInput.value && startInput.value < minDate) {
+                    startInput.value = minDate;
+                }
+                enforceEndMin();
+            };
+
+            leaveSelect.addEventListener('change', applyLeaveMin);
+            startInput.addEventListener('change', enforceEndMin);
+            applyLeaveMin();
+        })();
     </script>
 @endsection

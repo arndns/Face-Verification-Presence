@@ -20,16 +20,6 @@ class UserSeeder extends Seeder
             'password' => Hash::make('mugo2sukses'),
         ]);
 
-        $user1 = User::create([
-            'username' => '1234567890', // Username = NIK
-            'password' => Hash::make('password123'),
-            'role' => 'employee',
-        ]);
-
-        Employee::create([
-            'user_id' => $user1->id,
-            'nik' => '1234567890',
-            'nama' => 'John Doe',
-        ]);
+        
     }
 }

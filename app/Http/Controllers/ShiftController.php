@@ -10,7 +10,7 @@ class ShiftController extends Controller
 {
     public function index()
     {
-        $shifts = Shift::orderBy('nama_shift')->paginate(10);
+        $shifts = Shift::orderBy('nama_shift')->paginate(5);
 
         return view('Admin.shift.index', compact('shifts'));
     }

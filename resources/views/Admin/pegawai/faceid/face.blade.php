@@ -5,12 +5,6 @@
 
     <div class="container mt-5">
 
-        @if (session('warning'))
-            <div class="alert alert-warning">
-                {{ session('warning') }}
-            </div>
-        @endif
-
         <div class="row g-4 justify-content-center">
 
             <div class="col-12 col-md-6">
@@ -211,6 +205,8 @@
             scaleFactor: 0.8,           // sedikit lebih kasar supaya lebih cepat
         };
 
+        let faceApiScriptPromise = null;
+
         document.addEventListener("DOMContentLoaded", () => {
 
             const rekamButton = document.getElementById('rekamwajah');
@@ -227,7 +223,17 @@
             const hint = document.getElementById('orientation-hint');
             if (hint) hint.innerText = 'Tunggu, model sedang dimuat';
 
-            await ensureFaceAPI();
+            try {
+                await ensureFaceAPI();
+            } catch (err) {
+                console.error('FaceAPI gagal dimuat:', err);
+                Swal.fire(
+                    'Gagal Memuat FaceAPI',
+                    err?.message || 'Library face-api.min.js tidak bisa diunduh. Periksa koneksi atau izinkan CDN.',
+                    'error'
+                );
+                return;
+            }
 
             Swal.fire({
                 title: 'Memuat kamera',
@@ -237,21 +243,56 @@
                     Swal.showLoading();
                 }
             });
-            await loadFaceModels();
-            Swal.close();
-            startCamera();
-            setupEnrollmentButton('rekamwajah', '.camera-open video');
+            try {
+                await loadFaceModels();
+                Swal.close();
+                startCamera();
+                setupEnrollmentButton('rekamwajah', '.camera-open video');
+            } catch (err) {
+                console.error('Model gagal dimuat:', err);
+                Swal.fire('Gagal Memuat Model', err?.message || 'Model wajah tidak bisa dimuat.', 'error');
+            }
         }
 
         function ensureFaceAPI() {
             if (window.faceapi) return Promise.resolve();
-            return new Promise((ok, err) => {
-                const s = document.createElement("script");
-                s.src = "{{ asset('assets/js/face-api.min.js') }}";
-                s.onload = ok;
-                s.onerror = err;
-                document.head.appendChild(s);
+            if (faceApiScriptPromise) return faceApiScriptPromise;
+
+            const CDN_FALLBACK = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
+            const base = "{{ asset('assets/js/face-api.min.js') }}";
+            const localUrl = `${window.location.origin}/assets/js/face-api.min.js`;
+            const normalizeProtocol = (url) => {
+                if (!url) return null;
+                if (window.location.protocol === 'https:' && url.startsWith('http://')) {
+                    return url.replace('http://', 'https://');
+                }
+                return url;
+            };
+            const sources = Array.from(
+                new Set([base, localUrl, CDN_FALLBACK].map(normalizeProtocol).filter(Boolean))
+            );
+
+            faceApiScriptPromise = new Promise((resolve, reject) => {
+                const tryLoad = (idx = 0) => {
+                    if (idx >= sources.length) {
+                        reject(new Error('FaceAPI tidak bisa dimuat (lokal & CDN gagal).'));
+                        return;
+                    }
+                    const url = sources[idx];
+                    const s = document.createElement("script");
+                    s.src = url;
+                    s.onload = resolve;
+                    s.onerror = (event) => {
+                        console.warn('Gagal memuat face-api dari', url, event);
+                        s.remove();
+                        tryLoad(idx + 1);
+                    };
+                    document.head.appendChild(s);
+                };
+                tryLoad();
             });
+
+            return faceApiScriptPromise;
         }
 
         async function loadFaceModels() {

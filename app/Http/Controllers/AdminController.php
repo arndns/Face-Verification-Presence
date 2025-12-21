@@ -42,6 +42,7 @@ class AdminController extends Controller
         $search = $request->input('search');
 
         $employee = Employee::query()
+            ->with(['faceEmbeddings'])
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('nik', 'like', "%{$search}%")
@@ -52,6 +53,15 @@ class AdminController extends Controller
             ->orderBy('id', 'asc')
             ->paginate(5)
             ->withQueryString();
+
+        if ($request->boolean('face_warning')) {
+            $name = $request->input('employee_name');
+            $message = 'Data wajah sudah ada.';
+            if ($name) {
+                $message = "Data wajah {$name} sudah ada.";
+            }
+            session()->flash('warning', $message);
+        }
 
         return view('Admin.pegawai.data', compact('employee', 'search'));
     }
@@ -65,15 +75,22 @@ class AdminController extends Controller
     }
     public function store(Request $request)
     {
-        $validator = $request->validate([
-            'nik' => 'required|string|max:20|unique:employees,nik|unique:users,username',
-            'nama' => 'required|string|max:255',
-            'email' => 'required|email|unique:employees,email',
-            'no_hp' => 'nullable|string|max:15',
-            'jabatan' => 'required|string|max:100',
-            'foto' => 'nullable|image|mimes:jpeg,jpg|max:2048',
-            'password' => ['required', 'confirmed', Password::min(8)],
-        ]);
+        $validator = $request->validate(
+            [
+                'nik' => 'required|string|max:20|unique:employees,nik|unique:users,username',
+                'nama' => 'required|string|max:255',
+                'email' => 'required|email|unique:employees,email',
+                'no_hp' => 'nullable|string|max:15',
+                'jabatan' => 'required|string|max:100',
+                'foto' => 'nullable|image|mimes:jpeg,jpg|max:2048',
+                'password' => ['required', 'confirmed', Password::min(8)],
+            ],
+            [
+                'foto.max' => 'Ukuran foto terlalu besar. Gunakan foto maksimal 2 MB.',
+                'foto.mimes' => 'Format foto harus JPG atau JPEG.',
+                'foto.image' => 'File yang diunggah harus berupa gambar.',
+            ]
+        );
 
         if ($request->hasFile('foto')) {
             $file = $request->file('foto');
@@ -123,15 +140,22 @@ class AdminController extends Controller
 
     public function update(Request $request, Employee $employee)
     {
-        $validator = $request->validate([
-            'nik' => 'required|string|max:20|unique:employees,nik,' . $employee->id . '|unique:users,username,' . $employee->user_id,
-            'nama' => 'required|string|max:255',
-            'email' => 'required|email|unique:employees,email,' . $employee->id,
-            'no_hp' => 'nullable|string|max:15',
-            'jabatan' => 'required|string|max:100',
-            'foto' => 'nullable|image|mimes:jpeg,jpg|max:2048',
-            'password' => ['nullable', 'confirmed', Password::min(8)], 
-        ]);
+        $validator = $request->validate(
+            [
+                'nik' => 'required|string|max:20|unique:employees,nik,' . $employee->id . '|unique:users,username,' . $employee->user_id,
+                'nama' => 'required|string|max:255',
+                'email' => 'required|email|unique:employees,email,' . $employee->id,
+                'no_hp' => 'nullable|string|max:15',
+                'jabatan' => 'required|string|max:100',
+                'foto' => 'nullable|image|mimes:jpeg,jpg|max:2048',
+                'password' => ['nullable', 'confirmed', Password::min(8)], 
+            ],
+            [
+                'foto.max' => 'Ukuran foto terlalu besar. Gunakan foto maksimal 2 MB.',
+                'foto.mimes' => 'Format foto harus JPG atau JPEG.',
+                'foto.image' => 'File yang diunggah harus berupa gambar.',
+            ]
+        );
 
         $oldFoto = $employee->foto;
         $newFotoPath = null;
@@ -323,7 +347,7 @@ class AdminController extends Controller
         $sortedData = $mergedData->sortByDesc('datetime')->values();
 
         // 5. Manual Pagination
-        $perPage = 15;
+        $perPage = 5;
         $currentPage = Paginator::resolveCurrentPage() ?: 1;
         $currentItems = $sortedData->slice(($currentPage - 1) * $perPage, $perPage)->all();
         
@@ -365,7 +389,7 @@ class AdminController extends Controller
             });
         }
 
-        $permits = $query->orderBy('created_at', 'desc')->paginate(15);
+        $permits = $query->orderBy('created_at', 'desc')->paginate(5);
 
         return view('Admin.permit.index', compact('permits'));
     }
@@ -411,5 +435,11 @@ class AdminController extends Controller
         ]);
 
         return redirect()->route('admin.permit.index')->with('success', 'Status pengajuan cuti berhasil diperbarui.');
+    }
+
+    public function destroyPermit(\App\Models\Permit $permit)
+    {
+        $permit->delete();
+        return redirect()->route('admin.permit.index')->with('success', 'Pengajuan cuti berhasil dihapus.');
     }
 }

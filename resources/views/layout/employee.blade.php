@@ -69,7 +69,7 @@
                 <strong>Izin/Cuti</strong>
             </div>
         @else
-            <a href="{{ route('employee.camera') }}" class="item camera-col" id="bottom-nav-presence">
+            <a href="{{ route('employee.camera') }}" class="item camera-col" id="bottom-nav-presence" data-presence-nav>
                 <div class="d-flex justify-content-center align-items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>
@@ -125,6 +125,23 @@
             </script>
         @endif
 
+    <style>
+        .presence-disabled [data-presence-nav] {
+            pointer-events: none;
+            opacity: 0.6;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                if (sessionStorage.getItem('employeeGeoBlocked') === '1') {
+                    document.body.classList.add('presence-disabled');
+                }
+            } catch (e) {
+                // ignore storage errors
+            }
+        });
+    </script>
 </body>
 
 

@@ -14,7 +14,7 @@ class LocationController extends Controller
     public function locindex()
     {
 
-        $locations = Location::paginate(10);
+        $locations = Location::paginate(5);
         return view('Admin.lokasi.index', compact('locations'));
     }
     public function create()

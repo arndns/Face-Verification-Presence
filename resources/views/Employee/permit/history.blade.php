@@ -23,6 +23,12 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             </div>
         @endif
+        @if(session('warning'))
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-triangle"></i> {{ session('warning') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        @endif
 
         <div class="mb-3">
             <a href="{{ route('employee.permit.create') }}" class="btn btn-primary w-100">
@@ -72,9 +78,18 @@
                             </div>
                         @endif
 
-                        <small class="text-muted d-block mt-2">
-                            <i class="fas fa-clock"></i> Diajukan: {{ $permit->created_at->diffForHumans() }}
-                        </small>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-2">
+                            <small class="text-muted">
+                                <i class="fas fa-clock"></i> Diajukan: {{ $permit->created_at->diffForHumans() }}
+                            </small>
+                            <form action="{{ route('employee.permit.destroy', $permit->id) }}" method="POST" onsubmit="return confirm('Hapus pengajuan ini?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-outline-danger btn-sm">
+                                    <i class="fas fa-trash"></i> Hapus
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             @endforeach

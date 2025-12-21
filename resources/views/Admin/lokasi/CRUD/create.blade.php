@@ -44,11 +44,23 @@
                             <!-- Status Lokasi dari GPS -->
                             <div id="locationStatus" class="form-text mt-1 mb-3"></div>
 
+                            <!-- Peta Lokasi -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <label class="form-label fw-semibold mb-0"><i class="fas fa-map-marked-alt me-2 text-primary"></i>Pilih Lokasi di Peta</label>
+                                    <button type="button" class="btn btn-sm btn-outline-primary" id="useCurrentLocation">
+                                        <i class="fas fa-location-crosshairs me-1"></i> Gunakan Lokasi Saya
+                                    </button>
+                                </div>
+                                <div id="map" style="height: 400px; width: 100%; border-radius: 8px; border: 1px solid #ced4da;"></div>
+                                <small class="text-muted">Geser marker atau klik pada peta untuk menentukan lokasi.</small>
+                            </div>
+
                             <div class="row">
                                 <!-- Field Latitude -->
                                 <div class="col-md-6 mb-3">
                                     <label for="latitude" class="form-label fw-semibold"><i class="fas fa-location-arrow me-2 text-primary"></i>Latitude</label>
-                                    <input type="text" name="latitude" id="latitude" class="form-control @error('latitude') is-invalid @enderror" placeholder="Mendapatkan..." value="{{ old('latitude') }}" readonly>
+                                    <input type="text" name="latitude" id="latitude" class="form-control @error('latitude') is-invalid @enderror" placeholder="Mendapatkan..." value="{{ old('latitude') }}">
                                     @error('latitude')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -56,7 +68,7 @@
                                 <!-- Field Longitude -->
                                 <div class="col-md-6 mb-3">
                                     <label for="longitude" class="form-label fw-semibold"><i class="fas fa-location-arrow me-2 text-primary"></i>Longitude</label>
-                                    <input type="text" name="longitude" id="longitude" class="form-control @error('longitude') is-invalid @enderror" placeholder="Mendapatkan..." value="{{ old('longitude') }}" readonly>
+                                    <input type="text" name="longitude" id="longitude" class="form-control @error('longitude') is-invalid @enderror" placeholder="Mendapatkan..." value="{{ old('longitude') }}">
                                      @error('longitude')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -90,52 +102,144 @@
 
 
 @endsection
+@section('style')
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+@endsection
+
 @section('script')
-
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
-        const latitudeInput = document.getElementById('latitude');
-        const longitudeInput = document.getElementById('longitude');
-        const locationStatus = document.getElementById('locationStatus');
+        document.addEventListener('DOMContentLoaded', function() {
+            const latInput = document.getElementById('latitude');
+            const lngInput = document.getElementById('longitude');
+            const radiusInput = document.getElementById('radius');
+            const statusEl = document.getElementById('locationStatus');
+            const useLocationBtn = document.getElementById('useCurrentLocation');
+            const GEO_OPTIONS_FAST = { enableHighAccuracy: false, maximumAge: 30000, timeout: 12000 };
+            const GEO_OPTIONS_PRECISE = { enableHighAccuracy: true, maximumAge: 20000, timeout: 20000 };
 
-        // Fungsi ini akan dipanggil saat halaman dimuat
-        window.addEventListener('load', () => {
-            if (navigator.geolocation) {
-                locationStatus.textContent = 'Mendapatkan lokasi...';
-                locationStatus.classList.remove('text-danger', 'text-success');
-                navigator.geolocation.getCurrentPosition(showPosition, showError);
-            } else {
-                locationStatus.textContent = 'Geolocation tidak didukung oleh browser ini.';
-                locationStatus.classList.add('text-danger');
+            let defaultLat = -6.2088;
+            let defaultLng = 106.8456;
+            let zoomLevel = 13;
+
+            if (latInput.value && lngInput.value) {
+                defaultLat = parseFloat(latInput.value);
+                defaultLng = parseFloat(lngInput.value);
+                zoomLevel = 16;
+            }
+
+            const map = L.map('map').setView([defaultLat, defaultLng], zoomLevel);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            let marker = L.marker([defaultLat, defaultLng], { draggable: true }).addTo(map);
+            let circle = L.circle([defaultLat, defaultLng], {
+                color: 'blue',
+                fillColor: '#3085d6',
+                fillOpacity: 0.1,
+                radius: parseFloat(radiusInput.value) || 0
+            }).addTo(map);
+
+            marker.on('dragend', function() {
+                const pos = marker.getLatLng();
+                updateInputs(pos.lat, pos.lng);
+                updateCircle(pos.lat, pos.lng);
+            });
+
+            map.on('click', function(e) {
+                const pos = e.latlng;
+                marker.setLatLng(pos);
+                updateInputs(pos.lat, pos.lng);
+                updateCircle(pos.lat, pos.lng);
+            });
+
+            latInput.addEventListener('change', updateMarkerFromInputs);
+            lngInput.addEventListener('change', updateMarkerFromInputs);
+            radiusInput.addEventListener('input', function() {
+                const r = parseFloat(this.value) || 0;
+                circle.setRadius(r);
+            });
+
+            function updateInputs(lat, lng) {
+                latInput.value = lat;
+                lngInput.value = lng;
+            }
+
+            function updateCircle(lat, lng) {
+                circle.setLatLng([lat, lng]);
+            }
+
+            function updateMarkerFromInputs() {
+                const lat = parseFloat(latInput.value);
+                const lng = parseFloat(lngInput.value);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    const newLatLng = new L.LatLng(lat, lng);
+                    marker.setLatLng(newLatLng);
+                    circle.setLatLng(newLatLng);
+                    map.panTo(newLatLng);
+                }
+            }
+
+            // Auto-get current location if inputs empty
+            if (!latInput.value || !lngInput.value) {
+                tryGetCurrentPosition(true);
+            }
+
+            if (useLocationBtn) {
+                useLocationBtn.addEventListener('click', function() {
+                    tryGetCurrentPosition(false);
+                });
+            }
+
+            function tryGetCurrentPosition(isAuto = false) {
+                if (!navigator.geolocation) {
+                    setStatus('Browser tidak mendukung geolocation.', 'text-danger');
+                    return;
+                }
+
+                setStatus(isAuto ? 'Mendapatkan lokasi...' : 'Meminta lokasi Anda...', 'text-info');
+                navigator.geolocation.getCurrentPosition(onSuccess, onErrorFast, GEO_OPTIONS_FAST);
+
+                function onSuccess(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    updateInputs(lat, lng);
+                    const newLatLng = new L.LatLng(lat, lng);
+                    marker.setLatLng(newLatLng);
+                    circle.setLatLng(newLatLng);
+                    map.setView(newLatLng, 18);
+                    setStatus('Lokasi berhasil diperbarui ke posisi Anda saat ini.', 'text-success');
+                }
+
+                function onErrorFast(error) {
+                    if (error.code === error.PERMISSION_DENIED) {
+                        setStatus('Izin lokasi ditolak.', 'text-danger');
+                        return;
+                    }
+                    setStatus('Mencoba ulang dengan akurasi tinggi...', 'text-warning');
+                    navigator.geolocation.getCurrentPosition(onSuccess, onErrorFinal, GEO_OPTIONS_PRECISE);
+                }
+
+                function onErrorFinal(error) {
+                    let msg = 'Gagal mendapatkan lokasi.';
+                    switch (error.code) {
+                        case error.PERMISSION_DENIED: msg = 'Izin lokasi ditolak.'; break;
+                        case error.POSITION_UNAVAILABLE: msg = 'Informasi lokasi tidak tersedia.'; break;
+                        case error.TIMEOUT: msg = 'Waktu permintaan habis.'; break;
+                    }
+                    setStatus(msg, 'text-danger');
+                }
+            }
+
+            function setStatus(text, className) {
+                if (!statusEl) return;
+                statusEl.textContent = text;
+                statusEl.className = 'form-text mt-1 mb-3 ' + className;
             }
         });
-
-        function showPosition(position) {
-            latitudeInput.value = position.coords.latitude;
-            longitudeInput.value = position.coords.longitude;
-            locationStatus.textContent = 'Lokasi berhasil didapatkan!';
-            locationStatus.classList.add('text-success');
-            locationStatus.classList.remove('text-danger');
-        }
-
-        function showError(error) {
-            let message = '';
-            switch (error.code) {
-                case error.PERMISSION_DENIED:
-                    message = "Perizinan Lokasi Bermasalah.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    message = "Informasi lokasi tidak tersedia.";
-                    break;
-                case error.TIMEOUT:
-                    message = "Permintaan untuk mendapatkan lokasi pengguna timeout.";
-                    break;
-                case error.UNKNOWN_ERROR:
-                    message = "Terjadi kesalahan yang tidak diketahui.";
-                    break;
-            }
-            locationStatus.textContent = message;
-            locationStatus.classList.add('text-danger');
-            locationStatus.classList.remove('text-success');
-        }
     </script>
 @endsection

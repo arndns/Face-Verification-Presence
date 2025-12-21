@@ -14,8 +14,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Carbon;
 use Carbon\CarbonPeriod;
 
@@ -611,7 +614,6 @@ class EmployeeController extends Controller
         $rawHistories = $query
             ->orderByDesc('waktu_masuk')
             ->orderByDesc('waktu_pulang')
-            ->limit(50)
             ->get();
 
         $histories = $rawHistories->map(function ($presence) {
@@ -634,52 +636,64 @@ class EmployeeController extends Controller
             ->unique()
             ->values();
 
+        // Ambil tanggal izin disetujui untuk menghindari penambahan Alpha pada hari izin
         $approvedPermits = Permit::where('employee_id', $employee->id)
             ->where('status', 'approved')
-            ->when($fromDate, fn($q) => $q->whereDate('end_date', '>=', $fromDate))
-            ->when($toDate, fn($q) => $q->whereDate('start_date', '<=', $toDate))
+            ->when($fromDate, fn ($q) => $q->whereDate('end_date', '>=', $fromDate))
+            ->when($toDate, fn ($q) => $q->whereDate('start_date', '<=', $toDate))
             ->get();
 
+        $permitDates = collect();
         foreach ($approvedPermits as $permit) {
             $start = $permit->start_date ? Carbon::parse($permit->start_date) : null;
             $end = $permit->end_date ? Carbon::parse($permit->end_date) : null;
-
             if (!$start || !$end) {
                 continue;
             }
-
-            $period = CarbonPeriod::create($start, $end);
-
-            foreach ($period as $day) {
-                $dateIso = $day->format('Y-m-d');
-
-                if ($fromDate && $dateIso < $fromDate) {
-                    continue;
-                }
-
-                if ($toDate && $dateIso > $toDate) {
-                    continue;
-                }
-
-                if ($existingDates->contains($dateIso)) {
-                    continue;
-                }
-
-                $histories->push([
-                    'date_iso' => $dateIso,
-                    'formatted_date' => $day->translatedFormat('l, d M Y'),
-                    'masuk' => '-',
-                    'pulang' => '-',
-                    'status_label' => 'Izin (' . $this->formatLeaveTypeLabel($permit->leave_type) . ')',
-                    'status_badge' => 'info',
-                ]);
+            foreach (CarbonPeriod::create($start, $end) as $day) {
+                $permitDates->push($day->format('Y-m-d'));
             }
+        }
+        $permitDates = $permitDates->unique()->values();
+
+        // Tentukan rentang tanggal untuk penambahan Alpha:
+        // gunakan filter dari/to jika ada, selain itu hanya cek hari ini.
+        $rangeStart = $fromDate ? Carbon::parse($fromDate) : Carbon::today();
+        $rangeEnd = $toDate ? Carbon::parse($toDate) : Carbon::today();
+
+        foreach (CarbonPeriod::create($rangeStart, $rangeEnd) as $day) {
+            $dateIso = $day->format('Y-m-d');
+            if ($existingDates->contains($dateIso)) {
+                continue;
+            }
+            if ($permitDates->contains($dateIso)) {
+                continue; // Jangan tampilkan apa pun jika sedang izin
+            }
+            $histories->push([
+                'date_iso' => $dateIso,
+                'formatted_date' => $day->translatedFormat('l, d M Y'),
+                'masuk' => '-',
+                'pulang' => '-',
+                'status_label' => 'Alpha',
+                'status_badge' => 'danger',
+            ]);
         }
 
         $histories = $histories
             ->sortByDesc('date_iso')
-            ->values()
-            ->take(50);
+            ->values();
+
+        $perPage = 5;
+        $currentPage = Paginator::resolveCurrentPage() ?: 1;
+        $total = $histories->count();
+        $currentItems = $histories->slice(($currentPage - 1) * $perPage, $perPage)->values();
+        $histories = new LengthAwarePaginator(
+            $currentItems,
+            $total,
+            $perPage,
+            $currentPage,
+            ['path' => Paginator::resolveCurrentPath(), 'query' => $request->query()]
+        );
 
         return view('Employee.history_presence', [
             'employee' => $employee,
@@ -693,24 +707,76 @@ class EmployeeController extends Controller
 
     public function createPermit()
     {
+        $user = Auth::user();
+        $employee = $user?->employee;
+
+        if (!$employee) {
+            return redirect()->route('employee.index')->with('error', 'Data karyawan tidak ditemukan.');
+        }
+
+        $hasSubmittedToday = Permit::where('employee_id', $employee->id)
+            ->whereDate('created_at', Carbon::today())
+            ->exists();
+
+        if ($hasSubmittedToday) {
+            return redirect()->route('employee.permit.history')
+                ->with('warning', 'Anda sudah mengajukan izin/cuti hari ini. Pengajuan hanya diperbolehkan 1x per hari.');
+        }
+
         return view('Employee.permit.create');
     }
 
     public function storePermit(Request $request)
     {
-        $validated = $request->validate([
-            // Pengajuan harus dilakukan minimal H-1 sebelum tanggal mulai
-            'start_date' => 'required|date|after:today',
-            'end_date' => 'required|date|after_or_equal:start_date',
-            'leave_type' => 'required|in:sakit,izin,cuti_tahunan',
-            'reason' => 'required|string|max:500',
+        $validator = Validator::make($request->all(), [
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+            'leave_type' => ['required', 'in:sakit,izin,cuti_tahunan'],
+            'reason' => ['required', 'string', 'max:500'],
         ]);
+
+        $validator->after(function ($v) use ($request) {
+            $start = $request->input('start_date') ? Carbon::parse($request->input('start_date'))->startOfDay() : null;
+            $today = Carbon::today();
+            $type = $request->input('leave_type');
+
+            if (!$start) {
+                return;
+            }
+
+            if ($type === 'sakit') {
+                // Sakit boleh diajukan pada hari H (tidak boleh mundur ke hari sebelumnya)
+                if ($start->lt($today)) {
+                    $v->errors()->add('start_date', 'Tanggal mulai sakit tidak boleh sebelum hari ini.');
+                }
+            } else {
+                // Selain sakit wajib H-1 (tidak boleh hari ini)
+                if ($start->lte($today)) {
+                    $v->errors()->add('start_date', 'Pengajuan izin/cuti non-sakit hanya bisa diajukan minimal H-1.');
+                }
+            }
+        });
+
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        $validated = $validator->validated();
 
         $user = Auth::user();
         $employee = $user?->employee;
 
         if (!$employee) {
             return redirect()->back()->with('error', 'Data karyawan tidak ditemukan.');
+        }
+
+        // Batasi 1 pengajuan per hari (berdasarkan created_at)
+        $hasSubmittedToday = \App\Models\Permit::where('employee_id', $employee->id)
+            ->whereDate('created_at', Carbon::today())
+            ->exists();
+
+        if ($hasSubmittedToday) {
+            return redirect()->back()->withInput()->with('warning', 'Anda sudah mengajukan izin/cuti hari ini. Pengajuan hanya diperbolehkan 1x per hari.');
         }
 
         \App\Models\Permit::create([
@@ -725,6 +791,19 @@ class EmployeeController extends Controller
         return redirect()->route('employee.permit.history')->with('success', 'Pengajuan cuti berhasil dikirim!');
     }
 
+    public function destroyPermit(\App\Models\Permit $permit)
+    {
+        $user = Auth::user();
+        $employee = $user?->employee;
+
+        if (!$employee || $permit->employee_id !== $employee->id) {
+            abort(403, 'Anda tidak berhak menghapus pengajuan ini.');
+        }
+
+        $permit->delete();
+        return redirect()->route('employee.permit.history')->with('success', 'Pengajuan cuti berhasil dihapus.');
+    }
+
     public function permitHistory()
     {
         $user = Auth::user();
@@ -736,7 +815,7 @@ class EmployeeController extends Controller
 
         $permits = \App\Models\Permit::where('employee_id', $employee->id)
             ->orderBy('created_at', 'desc')
-            ->paginate(10);
+            ->paginate(5);
 
         return view('Employee.permit.history', compact('permits'));
     }

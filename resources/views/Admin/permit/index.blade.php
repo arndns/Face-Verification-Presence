@@ -43,12 +43,8 @@
                         <table class="table card-table table-vcenter text-nowrap datatable">
                             <thead>
                                 <tr>
-                                    <th>No</th>
                                     <th>Karyawan</th>
                                     <th>Jenis Cuti</th>
-                                    <th>Tanggal</th>
-                                    <th>Alasan</th>
-                                    <th>Respon Admin</th>
                                     <th>Status</th>
                                     <th>Aksi</th>
                                 </tr>
@@ -56,7 +52,6 @@
                             <tbody>
                                 @forelse($permits as $permit)
                                 <tr>
-                                    <td>{{ $loop->iteration + $permits->firstItem() - 1 }}</td>
                                     <td>
                                         <div>{{ $permit->employee->nama }}</div>
                                         <div class="text-muted small">{{ $permit->employee->nik }}</div>
@@ -71,25 +66,6 @@
                                         @endif
                                     </td>
                                     <td>
-                                        {{ \Carbon\Carbon::parse($permit->start_date)->translatedFormat('d M Y') }} - 
-                                        {{ \Carbon\Carbon::parse($permit->end_date)->translatedFormat('d M Y') }}
-                                        <div class="text-muted small">
-                                            ({{ \Carbon\Carbon::parse($permit->start_date)->diffInDays($permit->end_date) + 1 }} hari)
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="d-inline-block text-truncate" style="max-width: 150px;" 
-                                              data-bs-toggle="tooltip" title="{{ $permit->reason }}">
-                                            {{ $permit->reason }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="d-inline-block text-truncate" style="max-width: 150px;" 
-                                              data-bs-toggle="tooltip" title="{{ $permit->admin_note }}">
-                                            {{ $permit->admin_note ?? '-' }}
-                                        </span>
-                                    </td>
-                                    <td>
                                         @if($permit->status == 'pending')
                                             <span class="badge bg-warning text-white">Pending</span>
                                         @elseif($permit->status == 'approved')
@@ -99,32 +75,26 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if($permit->status == 'pending')
-                                            <button class="btn btn-sm btn-success" data-bs-toggle="modal" 
-                                                    data-bs-target="#modal-approve-{{ $permit->id }}">
-                                                Setujui
+                                        <div class="d-flex flex-wrap gap-1">
+                                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal"
+                                                data-bs-target="#modal-detail-{{ $permit->id }}" title="Lihat Detail">
+                                                <i class="fas fa-eye"></i>
                                             </button>
-                                            <button class="btn btn-sm btn-danger" data-bs-toggle="modal" 
-                                                    data-bs-target="#modal-reject-{{ $permit->id }}">
-                                                Tolak
-                                            </button>
-                                        @else
-                                            <button class="btn btn-sm btn-secondary" data-bs-toggle="modal" 
-                                                    data-bs-target="#modal-detail-{{ $permit->id }}">
-                                                Detail
-                                            </button>
-                                            <button class="btn btn-sm btn-warning" data-bs-toggle="modal" 
-                                                    data-bs-target="#modal-edit-{{ $permit->id }}">
-                                                Edit
-                                            </button>
-                                        @endif
+                                            <form action="{{ route('admin.permit.destroy', $permit->id) }}" method="POST" onsubmit="return confirm('Hapus pengajuan ini?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-danger" title="Hapus">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
 
                                 <!-- Modals akan di-render di sini atau di loop terpisah -->
                                 @empty
                                 <tr>
-                                    <td colspan="7" class="text-center">Tidak ada data pengajuan cuti.</td>
+                                    <td colspan="4" class="text-center">Tidak ada data pengajuan cuti.</td>
                                 </tr>
                                 @endforelse
                             </tbody>
@@ -193,7 +163,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-dismiss-all-modals>Batal</button>
                         <button type="submit" class="btn btn-danger">Tolak Pengajuan</button>
                     </div>
                 </form>
@@ -213,9 +183,20 @@
                     <dl class="row">
                         <dt class="col-5">Nama Karyawan:</dt>
                         <dd class="col-7">{{ $permit->employee->nama }}</dd>
+
+                        <dt class="col-5">NIK:</dt>
+                        <dd class="col-7">{{ $permit->employee->nik }}</dd>
                         
                         <dt class="col-5">Jenis Cuti:</dt>
-                        <dd class="col-7">{{ ucfirst($permit->leave_type) }}</dd>
+                        <dd class="col-7">
+                            @if($permit->leave_type == 'sakit')
+                                <span class="badge bg-danger text-white">Sakit</span>
+                            @elseif($permit->leave_type == 'izin')
+                                <span class="badge bg-warning text-white">Izin</span>
+                            @else
+                                <span class="badge bg-info text-white">Cuti Tahunan</span>
+                            @endif
+                        </dd>
                         
                         <dt class="col-5">Tanggal:</dt>
                         <dd class="col-7">
@@ -230,6 +211,8 @@
                         <dd class="col-7">
                             @if($permit->status == 'approved')
                                 <span class="badge bg-success">Disetujui</span>
+                            @elseif($permit->status == 'pending')
+                                <span class="badge bg-warning text-white">Pending</span>
                             @else
                                 <span class="badge bg-danger">Ditolak</span>
                             @endif
@@ -240,7 +223,33 @@
                     </dl>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Tutup</button>
+                    <div class="d-flex w-100 justify-content-between align-items-center flex-wrap gap-2">
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Tutup</button>
+                        <div class="d-flex gap-2">
+                            @if($permit->status == 'pending')
+                                <button class="btn btn-success" data-bs-toggle="modal" 
+                                        data-bs-target="#modal-approve-{{ $permit->id }}">
+                                    Setujui
+                                </button>
+                                <button class="btn btn-danger" data-bs-toggle="modal" 
+                                        data-bs-target="#modal-reject-{{ $permit->id }}">
+                                    Tolak
+                                </button>
+                            @else
+                                <button class="btn btn-warning text-white" data-bs-toggle="modal" 
+                                        data-bs-target="#modal-edit-{{ $permit->id }}">
+                                    Ubah Status
+                                </button>
+                            @endif
+                            <form action="{{ route('admin.permit.destroy', $permit->id) }}" method="POST" onsubmit="return confirm('Hapus pengajuan ini?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-outline-danger">
+                                    <i class="fas fa-trash"></i> Hapus
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -280,4 +289,22 @@
         </div>
     </div>
 @endforeach
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const cancelButtons = document.querySelectorAll('[data-dismiss-all-modals]');
+        cancelButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.modal.show').forEach((modalEl) => {
+                    const instance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                    instance.hide();
+                });
+                const redirectUrl = "{{ route('admin.permit.index') }}";
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
+                }
+            });
+        });
+    });
+</script>
 @endsection

@@ -34,42 +34,33 @@
                         <table class="table table-hover align-middle">
                             <thead>
                                 <tr>
-                                    <th>NO</th>
-                                    <th>KOTA</th>
-                                    <th>ALAMAT</th>
-                                    <th>LATITUDE</th>
-                                    <th>LONGTITUDE</th>
-                                    <th>RADIUS</th>
-                                    <th>AKSI</th>
+                                    <th style="width: 18%;" class="text-start">Kota</th>
+                                    <th style="width: 42%;" class="text-start">Alamat</th>
+                                    <th style="width: 15%;" class="text-center">Radius (m)</th>
+                                    <th style="width: 25%;" class="text-center"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse ($locations as $location)
                                     <tr>
-                                        <td>{{ ($locations->currentPage() - 1) * $locations->perPage() + $loop->iteration }}
-                                        </td>
-                                        <td>{{ $location->kota }}</td>
-                                        <td>{{ $location->alamat }}</td>
-                                        <td>{{ $location->latitude }}</td>
-                                        <td>{{ $location->longitude }}</td>
-                                        <td>{{ $location->radius }}</td>
-                                        <td class="align-middle">
-                                            <div
-                                                class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
-
-                                                <a href="{{ route('location.edit', $location->id) }}"
-                                                    class="btn btn-sm btn-warning">EDIT</a>
-
+                                        <td class="fw-semibold text-start">{{ $location->kota }}</td>
+                                        <td class="text-start">{{ $location->alamat }}</td>
+                                        <td class="text-center">{{ $location->radius }}</td>
+                                        <td class="text-center">
+                                            <div class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
+                                                <a href="{{ route('location.edit', $location->id) }}" class="btn btn-sm btn-warning text-white" title="Lihat Detail">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
                                                 <form action="{{route('location.delete', $location->id)}}" method="POST" class="mb-0">
                                                     @csrf
                                                     @method('DELETE')
 
-                                                    <button type="submit" class="btn btn-danger btn-sm"
-                                                        onclick="return confirm('Apakah Anda yakin ingin menghapus data ini?');">
-                                                        HAPUS
+                                                    <button type="submit" class="btn btn-sm btn-danger"
+                                                        onclick="return confirm('Apakah Anda yakin ingin menghapus data ini?');"
+                                                        title="Hapus Lokasi">
+                                                        <i class="fas fa-trash"></i>
                                                     </button>
                                                 </form>
-
                                             </div>
                                         </td>
                                     </tr>
