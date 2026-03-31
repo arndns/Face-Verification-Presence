@@ -50,32 +50,7 @@
 
                         <hr class="my-3">
 
-                        <div class="mb-3">
-                            <label class="form-label text-muted small mb-1">Pilih Arah Rekam</label>
-                            <select id="orientation" class="form-select">
-                                <option value="front">Depan</option>
-                                <option value="left">Miring Kiri</option>
-                                <option value="right">Miring Kanan</option>
-                                <option value="up">Menengadah (Atas)</option>
-                                <option value="down">Menunduk (Bawah)</option>
-                            </select>
-                            <small class="text-muted">Arah yang sudah tersimpan akan disembunyikan dari pilihan.</small>
-                        </div>
-
-                    <div id="saved-orientations-wrapper" class="alert alert-info small {{ empty($existingEmbeddings) || $existingEmbeddings->isEmpty() ? 'd-none' : '' }}">
-                        <div class="fw-semibold mb-1">Data yang sudah tersimpan:</div>
-                        <div id="saved-orientations" class="d-flex flex-wrap gap-2">
-                            @foreach ($existingEmbeddings ?? [] as $embedding)
-                                <span class="badge bg-success text-uppercase">
-                                    {{ $embedding->orientation ?? 'front' }}
-                                </span>
-                            @endforeach
-                        </div>
-                    </div>
-                    </div>
-                </div>
-
-                <div class="d-grid gap-2">
+                        <div class="d-grid gap-2">
                     <button class="btn btn-primary btn-lg" id="rekamwajah">
                         <i class="fas fa-camera me-2"></i>
                         Rekam Wajah
@@ -388,28 +363,9 @@
             const video = document.querySelector(videoSelector);
             const employeeIdInput = document.getElementById('employee-id');
             const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
-            const orientationSelect = document.getElementById('orientation');
-            const existingOrientations = new Set(
-                (@json(($existingEmbeddings ?? collect())->pluck('orientation')) || []).map(o => (o || '').toLowerCase())
-            );
-            const ALL_ORIENTATIONS = ['front', 'left', 'right', 'up', 'down'];
             const adminDataUrl = document.getElementById('admin-data-route')?.href || null;
-            const savedWrapper = document.getElementById('saved-orientations-wrapper');
-            const savedList = document.getElementById('saved-orientations');
-            const updateOrientationOptions = () => {
-                const options = Array.from(orientationSelect.options || []);
-                options.forEach(opt => {
-                    const val = (opt.value || '').toLowerCase();
-                    opt.hidden = existingOrientations.has(val);
-                });
-                // Pastikan value selalu ke opsi pertama yang tidak tersembunyi
-                const firstVisible = options.find(opt => !opt.hidden);
-                if (firstVisible) {
-                    orientationSelect.value = firstVisible.value;
-                }
-            };
 
-            if (!button || !video || !employeeIdInput || !csrfTokenMeta || !orientationSelect) {
+            if (!button || !video || !employeeIdInput || !csrfTokenMeta) {
                 Swal.fire(
                     'Error Kritis',
                     'Elemen halaman penting (ID Karyawan atau Token) tidak ditemukan. Halaman tidak bisa berfungsi.',
@@ -421,46 +377,7 @@
             const employeeId = employeeIdInput.value;
             const csrfToken = csrfTokenMeta.getAttribute('content');
 
-            const isAllComplete = () => ALL_ORIENTATIONS.every(o => existingOrientations.has(o));
-            const renderSavedOrientations = () => {
-                if (!savedWrapper || !savedList) return;
-                savedList.innerHTML = '';
-                existingOrientations.forEach((ori) => {
-                    const span = document.createElement('span');
-                    span.className = 'badge bg-success text-uppercase';
-                    span.textContent = ori || 'front';
-                    savedList.appendChild(span);
-                });
-                savedWrapper.classList.toggle('d-none', existingOrientations.size === 0);
-                updateOrientationOptions();
-            };
-            renderSavedOrientations();
-
-            if (isAllComplete()) {
-                button.disabled = true;
-                button.innerText = 'Semua arah sudah tersimpan';
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Semua arah lengkap',
-                    text: 'Data wajah lengkap. Mengalihkan ke halaman data pegawai...',
-                    timer: 1200,
-                    showConfirmButton: false,
-                }).then(() => {
-                    if (adminDataUrl) {
-                        window.location.href = adminDataUrl;
-                    }
-                });
-                return;
-            }
-
             button.addEventListener('click', async () => {
-                const orientation = (orientationSelect.value || 'front').toLowerCase();
-                const overlayInstruction = document.getElementById('overlay-instruction');
-                const hint = document.getElementById('orientation-hint');
-                const message = `Arahkan wajah: ${orientation}`;
-                if (overlayInstruction) overlayInstruction.innerText = message;
-                if (hint) hint.innerText = message;
-
                 button.disabled = true;
                 button.innerText = 'Memproses...';
                 setLoading(true, 'Mengambil wajah...');
@@ -476,13 +393,9 @@
                     }
 
                     const descriptor = detection.descriptor;
-                    await saveDescriptorToAPI(employeeId, descriptor, csrfToken, orientation, {
-                        skipRedirect: false,
-                        existingSet: existingOrientations,
-                        allOrientations: ALL_ORIENTATIONS,
+                    await saveDescriptorToAPI(employeeId, descriptor, csrfToken, {
                         adminDataUrl,
                         buttonRef: button,
-                        onSaved: renderSavedOrientations,
                     });
                 } catch (err) {
                     console.error(err);
@@ -506,6 +419,8 @@
             return new Promise(res => setTimeout(res, ms));
         }
 
+
+
         function setLoading(isLoading, message = '') {
             const overlay = document.getElementById('capture-loading');
             const text = document.getElementById('capture-loading-text');
@@ -516,17 +431,11 @@
             }
         }
 
-        async function saveDescriptorToAPI(employeeId, descriptor, csrfToken, orientation, options = {}) {
+        async function saveDescriptorToAPI(employeeId, descriptor, csrfToken, options = {}) {
             const {
-                skipRedirect = false,
-                existingSet = null,
-                allOrientations = null,
                 adminDataUrl = null,
                 buttonRef = null,
-                onSaved = null,
             } = options;
-            const normalizeOri = (o) => (o || '').toLowerCase();
-            const targetOrientation = normalizeOri(orientation);
             try {
                 const response = await fetch('/api/save-embedding', {
                     method: 'POST',
@@ -537,38 +446,22 @@
                     body: JSON.stringify({
                         employee_id: employeeId,
                         descriptor: Array.from(descriptor),
-                        orientation: orientation || 'front',
                     })
                 });
 
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    if (existingSet && orientation) {
-                        existingSet.add(targetOrientation);
-                    }
-                    if (typeof onSaved === 'function') {
-                        onSaved();
-                    }
 
-                    const savedOrientation = (data.orientation || targetOrientation || 'front').toUpperCase();
-                    const successMessage = data.message
-                        ? `${data.message} (${savedOrientation})`
-                        : `Data wajah (${savedOrientation}) berhasil disimpan!`;
-
-                    const allCompleted = allOrientations
-                        ? allOrientations.every((o) => existingSet?.has(normalizeOri(o)))
-                        : false;
-
-                    if (!skipRedirect && allCompleted && adminDataUrl) {
+                    if (adminDataUrl) {
                         if (buttonRef) {
                             buttonRef.disabled = true;
-                            buttonRef.innerText = 'Semua arah tersimpan';
+                            buttonRef.innerText = 'Berhasil';
                         }
-                        sessionStorage.setItem('showSuccessModal', successMessage || 'Semua arah tersimpan');
+                        sessionStorage.setItem('showSuccessModal', data.message || 'Data wajah berhasil disimpan');
                         window.location.href = adminDataUrl;
                     } else {
-                        await Swal.fire('Berhasil', successMessage, 'success');
+                        await Swal.fire('Berhasil', data.message || 'Data wajah berhasil disimpan', 'success');
                     }
                     return { success: true, data };
                 }

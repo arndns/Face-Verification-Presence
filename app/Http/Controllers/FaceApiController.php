@@ -13,26 +13,16 @@ class FaceApiController extends Controller
     public function addfaceid($id)
     {
         $employee = Employee::findOrFail($id);
-        $existingEmbeddings = Face_Embedding::where('employee_id', $id)->get();
-        $existingOrientations = $existingEmbeddings
-            ->pluck('orientation')
-            ->filter()
-            ->map(fn ($o) => strtolower($o))
-            ->unique()
-            ->values();
+        $hasEmbedding = Face_Embedding::where('employee_id', $id)->exists();
 
-        $allOrientations = collect(['front', 'left', 'right', 'up', 'down']);
-        $hasAll = $allOrientations->every(fn ($ori) => $existingOrientations->contains($ori));
-
-        if ($hasAll) {
+        if ($hasEmbedding) {
             return redirect()
                 ->route('admin.data')
-                ->with('warning', 'Pegawai sudah merekam semua arah wajah. Perekaman ulang tidak diperlukan.');
+                ->with('warning', 'Pegawai sudah memiliki data wajah. Perekaman ulang tidak diperlukan.');
         }
+
         return view('Admin.pegawai.faceid.face', [
             'employee' => $employee,
-            'hasEmbedding' => $existingEmbeddings->isNotEmpty(),
-            'existingEmbeddings' => $existingEmbeddings,
         ]);
     }
 
@@ -42,7 +32,6 @@ class FaceApiController extends Controller
         $validate = Validator::make($request->all(), [
             'employee_id' => 'required|integer|exists:employees,id',
             'descriptor'  => 'required|array|size:128',
-            'orientation' => 'required|string|in:front,left,right,up,down',
         ]);
 
         if ($validate->fails()) {
@@ -54,7 +43,6 @@ class FaceApiController extends Controller
         }
 
         $employeeId = (int) $request->input('employee_id');
-        $orientation = strtolower((string) $request->input('orientation', 'front'));
         $descriptorArray = array_map('floatval', $request->descriptor);
 
         try {
@@ -62,7 +50,6 @@ class FaceApiController extends Controller
             $embedding = Face_Embedding::updateOrCreate(
                 [
                     'employee_id' => $employeeId,
-                    'orientation' => $orientation,
                 ],
                 [
                     'descriptor'  => $descriptorArray,
@@ -71,11 +58,10 @@ class FaceApiController extends Controller
 
             $action = $embedding->wasRecentlyCreated ? 'disimpan' : 'diperbarui';
 
-            Log::info("Sukses: Wajah berhasil {$action} untuk ID {$employeeId} ({$orientation}).");
+            Log::info("Sukses: Wajah berhasil {$action} untuk ID {$employeeId}.");
             return response()->json([
                 'success' => true,
                 'message' => "Data wajah berhasil {$action}.",
-                'orientation' => $embedding->orientation,
             ]);
         } catch (\Exception $e) {
             Log::error('Error 500:', ['message' => $e->getMessage()]);

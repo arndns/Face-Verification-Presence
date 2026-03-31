@@ -1,23 +1,15 @@
-@extends('layout.employee')
-@section('title', 'Camera')
-@section('header')
-    <div class="appHeader text-light p-3 d-flex align-items-center justify-content-between shadow-sm">
-        <div class="left">
-            <a href="javascript:;" class="headerButton goBack text-light" onclick="confirmExit()">
-                <!-- Font Awesome back icon -->
-                <i class="fas fa-chevron-left fa-lg"></i>
-            </a>
-        </div>
-        <div class="pageTitle h5 mb-0">
-            Attendance Employee
-        </div>
-        <div class="right" style="width: 24px;">
-
-        </div>
-    </div>
-@endsection
+@extends('layout.admin')
+@section('title', 'Presensi Karyawan')
 @section('content')
-    <div class="p-4 camera-page">
+    <div class="container-fluid camera-page">
+        <div class="row mb-3">
+            <div class="col-12 d-flex align-items-center justify-content-between">
+                <h2 class="mb-0"><i class="fas fa-user-check text-primary me-2"></i> Presensi Karyawan</h2>
+                <a href="{{ route('admin.index') }}" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Kembali
+                </a>
+            </div>
+        </div>
         <div class="camera-shell mx-auto">
             <div class="w-100 mb-4" data-camera-wrapper>
                 <input type="hidden" id="location" placeholder="Menunggu lokasi..." readonly>
@@ -31,13 +23,24 @@
             
             <div class="w-100">
                 <button class="btn btn-primary btn-lg w-100 d-flex align-items-center justify-content-center gap-2"
-                    id="attendance-action-btn" data-user-id="{{ $user->id ?? auth()->id() }}">
+                    id="attendance-action-btn">
                     <i class="fa-solid fa-fingerprint"></i>
                     <span id="button-text">Mulai Presensi</span>
                 </button>
                 <small class="text-muted d-block mt-2">
-                    Tekan jika verifikasi otomatis belum berjalan atau ingin mengulang proses presensi.
+                    Tekan untuk memulai verifikasi presensi.
                 </small>
+            </div>
+
+            <div class="w-100 mt-3 threshold-control">
+                <label for="face-threshold-range" class="form-label small text-muted mb-1">Threshold Verifikasi</label>
+                <div class="d-flex align-items-center gap-2">
+                    <input type="range" class="form-range" id="face-threshold-range" min="0.2" max="0.6"
+                        step="0.01" value="0.38">
+                    <input type="number" class="form-control form-control-sm" id="face-threshold-input" min="0.2"
+                        max="0.6" step="0.01" value="0.38">
+                </div>
+                <small class="text-muted d-block mt-1">Semakin kecil, semakin ketat.</small>
             </div>
 
             <div class="w-100 mt-4 presence-map-card">
@@ -45,8 +48,8 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <h6 class="mb-0">Lokasi Presensi</h6>
-                            @if ($employeeLocationPayload)
-                                <span class="badge bg-primary">Radius {{ $employeeLocationPayload['radius'] ?? 0 }} m</span>
+                            @if ($presenceLocationPayload)
+                                <span class="badge bg-primary">Radius {{ $presenceLocationPayload['radius'] ?? 0 }} m</span>
                             @endif
                         </div>
                         <div id="presence-map" class="presence-map rounded"></div>
@@ -175,14 +178,22 @@
             }
         }
 
+        .threshold-control .form-range {
+            flex: 1 1 auto;
+        }
+        .threshold-control .form-control {
+            max-width: 96px;
+        }
+
     </style>
 
 
 @endsection
 @section('script')
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        const EMPLOYEE_LOCATION = @json($employeeLocationPayload);
+        const EMPLOYEE_LOCATION = @json($presenceLocationPayload);
         const GEOLOCATION_OPTIONS_FAST = {
             enableHighAccuracy: false,
             maximumAge: 30000,
@@ -193,9 +204,12 @@
             maximumAge: 15000,
             timeout: 30000
         };
-        const FACE_VERIFICATION_THRESHOLD = 0.38; // 
-        const FACE_VERIFICATION_MARGIN = 0.03; // 
-        const FACE_MATCH_LIMIT = FACE_VERIFICATION_THRESHOLD + FACE_VERIFICATION_MARGIN;
+        const DEFAULT_FACE_THRESHOLD = 0.38;
+        const FACE_VERIFICATION_MARGIN = 0.03;
+        const FACE_THRESHOLD_MIN = 0.2;
+        const FACE_THRESHOLD_MAX = 0.6;
+        let faceVerificationThreshold = DEFAULT_FACE_THRESHOLD;
+        const getFaceMatchLimit = () => faceVerificationThreshold + FACE_VERIFICATION_MARGIN;
         const VERIFICATION_SAMPLES = 5;
         const REQUIRED_MATCHES = 3;
         const FRAME_DELAY_MS = 120;
@@ -216,8 +230,12 @@
         const GEO_ACCURACY_IMPROVEMENT_MARGIN = 5;
         const GEO_STABLE_ACCURACY = 35;
         const MAP_DISABLED = true; // jangan tampilkan peta di halaman presensi
-        const USE_DASHBOARD_GPS = true; // ambil koordinat dari GPS yang dikirim di dashboard
+        const USE_DASHBOARD_GPS = false; // ambil lokasi langsung dari perangkat admin
         let referenceEmbeddings = []; // Diisi saat init() dari API (multi-orientasi)
+        let activeEmployee = null;
+        let activeEmployeeId = null;
+        let thresholdRangeEl = null;
+        let thresholdInputEl = null;
         let isVerifying = false;
         let recentSuccess = false;
         let attendanceButtonInitialized = false;
@@ -325,7 +343,9 @@
             let disabled = false;
             const mode = getCurrentActionMode();
 
-            if (mode === 'check_out') {
+            if (mode === 'idle') {
+                label = 'Arahkan Wajah';
+            } else if (mode === 'check_out') {
                 label = 'Presensi Pulang';
             } else if (mode === 'check_in') {
                 label = 'Presensi Masuk';
@@ -348,10 +368,12 @@
                 disabled = true;
             }
 
-            if (!disabled) {
-                if (detectionState.status === 'ready') {
-                    label = 'Siap Presensi';
-                } else if (detectionState.status === 'multiple') {
+            const locationReady = Boolean(EMPLOYEE_LOCATION && locationValidation.ready);
+            if (locationReady && detectionState.status === 'ready') {
+                label = 'Siap Presensi';
+                disabled = false;
+            } else if (!disabled) {
+                if (detectionState.status === 'multiple') {
                     label = 'Terlalu Banyak Wajah';
                     disabled = true;
                 } else if (detectionState.status === 'unknown') {
@@ -375,6 +397,83 @@
             applyButtonIdleState();
         }
 
+        function clampThresholdValue(value) {
+            const parsed = Number.parseFloat(value);
+            if (!Number.isFinite(parsed)) return null;
+            return Math.min(FACE_THRESHOLD_MAX, Math.max(FACE_THRESHOLD_MIN, parsed));
+        }
+
+        function applyThresholdValue(value) {
+            const clamped = clampThresholdValue(value);
+            if (clamped === null) return;
+            faceVerificationThreshold = clamped;
+            const formatted = clamped.toFixed(2);
+            if (thresholdRangeEl) thresholdRangeEl.value = formatted;
+            if (thresholdInputEl) thresholdInputEl.value = formatted;
+        }
+
+        function initThresholdControls() {
+            thresholdRangeEl = document.getElementById('face-threshold-range');
+            thresholdInputEl = document.getElementById('face-threshold-input');
+            if (!thresholdRangeEl && !thresholdInputEl) return;
+
+            const initial = thresholdInputEl?.value || thresholdRangeEl?.value || DEFAULT_FACE_THRESHOLD;
+            applyThresholdValue(initial);
+
+            if (thresholdRangeEl) {
+                thresholdRangeEl.addEventListener('input', (event) => {
+                    applyThresholdValue(event.target.value);
+                });
+            }
+            if (thresholdInputEl) {
+                thresholdInputEl.addEventListener('input', (event) => {
+                    applyThresholdValue(event.target.value);
+                });
+                thresholdInputEl.addEventListener('change', (event) => {
+                    applyThresholdValue(event.target.value);
+                });
+            }
+        }
+
+        function resetPresenceState() {
+            presenceState.hasCheckedIn = false;
+            presenceState.hasCheckedOut = false;
+            presenceState.canCheckOut = false;
+            presenceState.lastClockIn = null;
+            presenceState.lastClockOut = null;
+            presenceState.isOnLeave = false;
+            presenceState.leaveInfo = null;
+            hasShownCheckInReminder = false;
+            hasShownCheckoutReminder = false;
+        }
+
+        function setActiveEmployee(match) {
+            const nextId = match?.employeeId ?? null;
+            if (!nextId) {
+                if (activeEmployeeId !== null) {
+                    activeEmployeeId = null;
+                    activeEmployee = null;
+                    resetPresenceState();
+                    applyButtonIdleState();
+                }
+                return;
+            }
+
+            if (activeEmployeeId === nextId) {
+                return;
+            }
+
+            activeEmployeeId = nextId;
+            activeEmployee = {
+                id: match.employeeId,
+                name: match.employeeName || match.employeeNik || null,
+                nik: match.employeeNik || null,
+            };
+            resetPresenceState();
+            monitorPresenceStatus({ showReminders: true, employeeId: activeEmployeeId });
+            applyButtonIdleState();
+        }
+
         function confirmExit() {
             if (window.Swal && typeof Swal.fire === 'function') {
                 Swal.fire({
@@ -388,12 +487,12 @@
                     cancelButtonText: 'Batal'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        window.location.href = '{{ route('employee.index') }}';
+                        window.location.href = '{{ route('admin.index') }}';
                     }
                 });
             } else {
                 if (confirm('Keluar dari halaman presensi?')) {
-                    window.location.href = '{{ route('employee.index') }}';
+                    window.location.href = '{{ route('admin.index') }}';
                 }
             }
         }
@@ -577,7 +676,8 @@
             locationStatusTextEl = document.getElementById('location-status-text');
             locationDistanceTextEl = document.getElementById('location-distance-text');
             refreshLocationBtn = document.getElementById('refresh-location-btn');
-            setLocationLoadingState(true, 'Mengambil koordinat dari dashboard...');
+            initThresholdControls();
+            setLocationLoadingState(true, 'Mengambil lokasi perangkat...');
 
             if (!EMPLOYEE_LOCATION) {
                 ensureLocationConfigured();
@@ -590,12 +690,14 @@
             initializeGeolocation();
             wireLocationButton();
 
-            monitorPresenceStatus({ showReminders: true });
             if (!presenceStatusInterval) {
                 presenceStatusInterval = setInterval(() => {
-                    monitorPresenceStatus({
-                        showReminders: true
-                    });
+                    if (activeEmployeeId) {
+                        monitorPresenceStatus({
+                            showReminders: true,
+                            employeeId: activeEmployeeId
+                        });
+                    }
                 }, STATUS_POLL_INTERVAL_MS);
             }
 
@@ -1132,7 +1234,7 @@
         async function getReferenceEmbedding() {
             try {
                 console.log('Mengambil data referensi dari server...');
-                const response = await fetch(`/api/employee/embedding`);
+                const response = await fetch(`/admin/presence/embeddings`);
 
                 if (!response.ok) {
                     const err = await response.json();
@@ -1142,18 +1244,14 @@
                 const data = await response.json();
                 const rawEmbeddings = Array.isArray(data.embeddings) ? data.embeddings : [];
 
-                if (!rawEmbeddings.length && data.descriptor) {
-                    rawEmbeddings.push({
-                        orientation: data.orientation || 'front',
-                        descriptor: data.descriptor,
-                    });
-                }
-
                 if (!rawEmbeddings.length) {
-                    throw new Error('Data embedding wajah belum tersedia. Hubungi admin.');
+                    throw new Error('Data wajah belum tersedia. Pastikan wajah karyawan sudah direkam.');
                 }
 
                 referenceEmbeddings = rawEmbeddings.map((item, index) => ({
+                    employeeId: item.employee_id,
+                    employeeName: item.employee_name,
+                    employeeNik: item.employee_nik,
                     orientation: item.orientation || 'front',
                     descriptor: normalizeDescriptor(item.descriptor, index),
                 }));
@@ -1163,7 +1261,7 @@
             } catch (err) {
                 console.error('Error mengambil embedding:', err);
                 console.error('Stack trace:', err.stack);
-                throw new Error(err.message || 'Data referensi wajah Anda tidak ditemukan.');
+                throw new Error(err.message || 'Data referensi wajah tidak ditemukan.');
             }
         }
 
@@ -1197,9 +1295,15 @@
             return new Float32Array(descriptorArray);
         }
 
-        function findBestReferenceDistance(descriptor) {
+        function findBestReferenceMatch(descriptor) {
             if (!referenceEmbeddings.length) {
-                return { distance: Infinity, orientation: null };
+                return {
+                    distance: Infinity,
+                    orientation: null,
+                    employeeId: null,
+                    employeeName: null,
+                    employeeNik: null,
+                };
             }
 
             return referenceEmbeddings.reduce(
@@ -1213,12 +1317,21 @@
                         return {
                             distance,
                             orientation: current.orientation || 'front',
+                            employeeId: current.employeeId,
+                            employeeName: current.employeeName,
+                            employeeNik: current.employeeNik,
                         };
                     }
 
                     return best;
                 },
-                { distance: Infinity, orientation: null }
+                {
+                    distance: Infinity,
+                    orientation: null,
+                    employeeId: null,
+                    employeeName: null,
+                    employeeNik: null,
+                }
             );
         }
 
@@ -1360,10 +1473,8 @@
                     window.addEventListener('resize', sync);
                     window.addEventListener('orientationchange', sync);
 
-                    const displayName =
-                        @json(optional(optional($user)->employee)->nama ?? (optional(optional($user)->employee)->nik ?? 'Tidak dikenali'));
                     tryInitAttendanceButton(video);
-                    const runWithReady = () => runDetect(video, overlay, wrap, displayName);
+                    const runWithReady = () => runDetect(video, overlay, wrap);
                     if (video.readyState >= 2) {
                         runWithReady();
                     } else {
@@ -1383,15 +1494,13 @@
             Webcam.attach(wrap);
         }
 
-        function runDetect(video, canvas, box, displayName) {
+        function runDetect(video, canvas, box) {
             const ctx = canvas.getContext('2d');
             const opts = getMtcnnOptions();
             const dpr = window.devicePixelRatio || 1;
-            const csrfTokenMeta = document.querySelector('meta[name="csrf-token"]');
-            const csrfToken = csrfTokenMeta ? csrfTokenMeta.getAttribute('content') : null;
 
             async function loop() {
-                if (video.readyState < 2 || isVerifying || !referenceEmbeddings.length || recentSuccess) {
+                if (video.readyState < 2 || isVerifying || recentSuccess) {
                     requestAnimationFrame(loop);
                     return;
                 }
@@ -1401,18 +1510,10 @@
                     return;
                 }
                 lastDetectAt = now;
-                if (!faceapi?.nets?.mtcnn?.isLoaded || !faceapi?.nets?.faceLandmark68Net?.isLoaded || !faceapi?.nets?.faceRecognitionNet?.isLoaded) {
+                if (!faceapi?.nets?.mtcnn?.isLoaded || !faceapi?.nets?.faceLandmark68Net?.isLoaded) {
                     // Model belum siap, tunggu frame berikutnya
                     requestAnimationFrame(loop);
                     return;
-                }
-
-                // Cek status presensi sebelum melakukan deteksi
-                const actionMode = getCurrentActionMode();
-                if (actionMode === 'on_leave' || actionMode === 'done' || actionMode === 'waiting') {
-                     updateStatusIndicatorForActionMode(actionMode);
-                     requestAnimationFrame(loop);
-                     return;
                 }
 
                 const drawSize = (() => {
@@ -1434,17 +1535,14 @@
 
                     const detections = await faceapi
                         .detectAllFaces(video, opts)
-                        .withFaceLandmarks()
-                        .withFaceDescriptors();
+                        .withFaceLandmarks();
 
                     ctx.setTransform(1, 0, 0, 1, 0, 0);
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
                     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.font = '12px "Inter", sans-serif';
-                    let recognizedFaces = 0;
-                    
+
                     const overlayMirrored = VIDEO_MIRRORED === true; // samakan orientasi overlay dengan tampilan video yang sudah mirror
 
                     detections.forEach((result) => {
@@ -1456,63 +1554,27 @@
                             video.videoHeight,
                             overlayMirrored
                         );
-                    if (!box) return;
-                    const drawX = box.x;
-                    ctx.beginPath();
-                    ctx.lineWidth = 2;
-                    ctx.strokeStyle = '#38bdf8';
-                    ctx.rect(drawX, box.y, box.width, box.height);
-                    ctx.stroke();
-
-                    let label = 'Tidak dikenali';
-                    let isMatch = false;
-                    if (result.descriptor && referenceEmbeddings.length) {
-                        const bestMatch = findBestReferenceDistance(result.descriptor);
-                        if (bestMatch.distance < FACE_MATCH_LIMIT) {
-                            label = displayName;
-                            recognizedFaces++;
-                            isMatch = true;
-                        }
-                    }
-
-                        const padding = 4;
-                        const textWidth = ctx.measureText(label).width;
-                        const textHeight = 14;
-                        const rectWidth = textWidth + padding * 2;
-                        const rectHeight = textHeight + padding;
-                        const rectX = drawX - padding;
-                        const rectY = box.y - textHeight - padding;
-                        const textY = box.y - 6;
-
-                        ctx.fillStyle = isMatch ? 'rgba(14, 165, 233, 0.8)' : 'rgba(239, 68, 68, 0.8)';
-                        ctx.strokeStyle = isMatch ? '#38bdf8' : '#ef4444';
-
-                        ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
-                        ctx.fillStyle = 'white';
-                        if (NAME_MIRRORED) {
-                            ctx.save();
-                            ctx.translate(rectX + rectWidth / 2, 0);
-                            ctx.scale(-1, 1);
-                            ctx.fillText(label, -(rectWidth / 2) + padding, textY);
-                            ctx.restore();
-                        } else {
-                            ctx.fillText(label, rectX + padding, textY);
-                        }
+                        if (!box) return;
+                        const drawX = box.x;
+                        ctx.beginPath();
+                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = '#38bdf8';
+                        ctx.rect(drawX, box.y, box.width, box.height);
+                        ctx.stroke();
                     });
 
-                    // Hanya tampilkan status; proses presensi dijalankan via tombol manual
-                    if (recognizedFaces === 1 && detections.length === 1) {
+                    if (detections.length === 1) {
                         setDetectionState('ready');
-                        updateStatusIndicator('Wajah Dikenali', 'Tekan tombol presensi untuk melanjutkan.', 'primary');
+                        updateStatusIndicator('Wajah Terdeteksi', 'Tekan tombol presensi untuk verifikasi.', 'primary');
                     } else if (detections.length > 1) {
                         setDetectionState('multiple');
                         updateStatusIndicator('Terlalu Banyak Wajah', 'Pastikan hanya satu wajah di kamera.', 'warning');
-                    } else if (detections.length === 1 && recognizedFaces === 0) {
-                        setDetectionState('unknown');
-                        updateStatusIndicator('Wajah Tidak Dikenali', 'Coba posisikan wajah lebih jelas.', 'danger');
                     } else {
                         setDetectionState('no_face');
                         updateStatusIndicator('Menunggu Wajah...', 'Posisikan wajah Anda di dalam bingkai.', 'secondary');
+                    }
+                    if (detections.length !== 1) {
+                        setActiveEmployee(null);
                     }
 
                 } catch (detectError) {
@@ -1552,15 +1614,21 @@
                     return;
                 }
 
-                const distanceResults = collectedDescriptors.map(descriptor => findBestReferenceDistance(descriptor));
+                const distanceResults = collectedDescriptors.map(descriptor => findBestReferenceMatch(descriptor));
                 const distances = distanceResults.map(result => result.distance);
                 const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
-                const matchCount = distances.filter(d => d < FACE_MATCH_LIMIT).length;
+                const matchLimit = getFaceMatchLimit();
+                const matchCount = distances.filter(d => d < matchLimit).length;
 
-                if (matchCount >= REQUIRED_MATCHES && avgDistance < FACE_MATCH_LIMIT) {
-                    updateStatusIndicator('Verifikasi Berhasil!', 'Mengirim data presensi...', 'success', true);
-                    const snapshotData = takeSnapshot(video);
-                    await sendPresenceRequest(csrfToken, snapshotData);
+                if (matchCount >= REQUIRED_MATCHES && avgDistance < matchLimit) {
+                    updateStatusIndicator('Verifikasi Berhasil!', 'Menampilkan hasil verifikasi...', 'success', true);
+                    await showVerificationResult(null, {
+                        threshold: faceVerificationThreshold,
+                        matchLimit,
+                        distance: avgDistance,
+                        matchCount,
+                        sampleCount: collectedDescriptors.length,
+                    });
                 } else {
                     updateStatusIndicator('Bukan Pemilik Akun', 'Wajah tidak cocok.', 'danger');
                     await new Promise(r => setTimeout(r, 2000)); // Delay agar user bisa baca pesan error
@@ -1606,6 +1674,24 @@
                 else if (type === 'warning') container.classList.add('border-warning');
                 else container.classList.remove('border-danger', 'border-success', 'border-warning');
             }
+        }
+
+        function formatVerificationSummary(details) {
+            if (!details) return '';
+            const formatNumber = (val, digits = 4) => Number.isFinite(val) ? val.toFixed(digits) : '-';
+            const thresholdText = Number.isFinite(details.threshold) ? details.threshold.toFixed(2) : '-';
+            const limitText = Number.isFinite(details.matchLimit) ? details.matchLimit.toFixed(2) : '-';
+            const distanceText = formatNumber(details.distance, 4);
+            const matchCount = Number.isFinite(details.matchCount) ? details.matchCount : 0;
+            const sampleCount = Number.isFinite(details.sampleCount) ? details.sampleCount : '-';
+            return `
+                <div class="mt-2 pt-2 border-top">
+                    <div class="fw-semibold mb-1">Ringkasan Verifikasi</div>
+                    <p class="mb-1"><strong>Threshold:</strong> ${thresholdText} (limit ${limitText})</p>
+                    <p class="mb-1"><strong>Jarak Verifikasi:</strong> ${distanceText}</p>
+                    <p class="mb-0"><strong>Cocok:</strong> ${matchCount} dari ${sampleCount}</p>
+                </div>
+            `;
         }
 
         function updateStatusIndicatorForActionMode(mode) {
@@ -1663,23 +1749,13 @@
                 return;
             }
 
-            const employeeId = button.getAttribute('data-user-id');
             const csrfToken = csrfTokenMeta.getAttribute('content');
 
-            // Validasi employeeId
-            if (!employeeId) {
-                console.error("❌ Employee ID tidak ditemukan di tombol");
-                button.disabled = true;
-                const buttonText = document.getElementById('button-text');
-                if (buttonText) buttonText.innerText = "Error: ID Tidak Ditemukan";
-                return;
-            }
-
-            console.log('✅ Setup tombol absensi berhasil untuk employee:', employeeId);
+            console.log('Setup tombol absensi berhasil untuk admin presence');
             applyButtonIdleState();
 
             button.addEventListener('click', async () => {
-                const actionMode = getCurrentActionMode();
+                const actionMode = activeEmployeeId ? getCurrentActionMode() : null;
                 if (actionMode === 'on_leave') {
                     Swal.fire('Sedang Izin', 'Anda tidak perlu presensi karena izin sudah disetujui.', 'info');
                     applyButtonIdleState();
@@ -1727,7 +1803,7 @@
                 console.log('Memulai proses verifikasi...');
 
                 Swal.fire({
-                    title: 'Mencoba melakukan presensi...',
+                    title: 'Mencoba melakukan verifikasi...',
                     text: 'Harap tetap di posisi yang sama sementara sistem memverifikasi wajah Anda.',
                     allowOutsideClick: false,
                     didOpen: () => Swal.showLoading(),
@@ -1763,43 +1839,110 @@
                         resetButton();
                         return;
                     }
+                    const matchResults = collectedDescriptors.map(descriptor => findBestReferenceMatch(descriptor));
+                    const matchLimit = getFaceMatchLimit();
+                    const summaryBase = {
+                        threshold: faceVerificationThreshold,
+                        matchLimit,
+                        sampleCount: collectedDescriptors.length,
+                    };
+                    const allDistances = matchResults
+                        .map(result => result.distance)
+                        .filter(distance => Number.isFinite(distance));
+                    const avgDistance = allDistances.length
+                        ? allDistances.reduce((sum, d) => sum + d, 0) / allDistances.length
+                        : null;
+                    const fallbackSummary = {
+                        ...summaryBase,
+                        distance: avgDistance,
+                        matchCount: allDistances.filter(d => d < matchLimit).length,
+                    };
+                    const validMatches = matchResults.filter(result => result.employeeId && result.distance < matchLimit);
 
-                    const distanceResults = collectedDescriptors.map(descriptor => findBestReferenceDistance(descriptor));
-                    const distances = distanceResults.map(result => result.distance);
-                    const minDistance = Math.min(...distances);
-                    const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
-                    const matchCount = distances.filter(d => d < FACE_MATCH_LIMIT).length;
+                    if (!validMatches.length) {
+                        const summaryHtml = formatVerificationSummary(fallbackSummary);
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Wajah Tidak Dikenali',
+                            html: `<div class="text-start"><p class="mb-2">Pastikan wajah sudah terdaftar dan terlihat jelas.</p>${summaryHtml}</div>`,
+                            allowOutsideClick: false,
+                            showConfirmButton: true,
+                            confirmButtonText: 'Ok',
+                        });
+                        resetButton();
+                        return;
+                    }
 
-                    console.log(`📏 Sampel jarak: ${distances.map(d => d.toFixed(4)).join(', ')}`);
+                    const groupedMatches = {};
+                    validMatches.forEach((match) => {
+                        if (!groupedMatches[match.employeeId]) {
+                            groupedMatches[match.employeeId] = {
+                                employeeId: match.employeeId,
+                                sample: match,
+                                distances: [],
+                            };
+                        }
+                        groupedMatches[match.employeeId].distances.push(match.distance);
+                    });
+
+                    const rankedMatches = Object.values(groupedMatches)
+                        .map((group) => {
+                            const avg = group.distances.reduce((sum, d) => sum + d, 0) / group.distances.length;
+                            return {
+                                ...group,
+                                avgDistance: avg,
+                                matchCount: group.distances.length,
+                                minDistance: Math.min(...group.distances),
+                            };
+                        })
+                        .sort((a, b) => b.matchCount - a.matchCount || a.avgDistance - b.avgDistance);
+
+                    const bestMatch = rankedMatches[0];
+                    if (!bestMatch) {
+                        Swal.fire('Verifikasi Gagal', 'Wajah tidak dapat diverifikasi.', 'error');
+                        resetButton();
+                        return;
+                    }
+
+                    console.log(`Sample distances: ${bestMatch.distances.map(d => d.toFixed(4)).join(', ')}`);
                     console.log(
-                        `✅ Minimum: ${minDistance.toFixed(4)}, Rata-rata: ${avgDistance.toFixed(4)}, Cocok: ${matchCount}`
+                        `Min: ${bestMatch.minDistance.toFixed(4)}, Avg: ${bestMatch.avgDistance.toFixed(4)}, Matches: ${bestMatch.matchCount}`
                     );
 
-                    if (matchCount >= REQUIRED_MATCHES && avgDistance < FACE_MATCH_LIMIT) {
-                        console.log('✅ Verifikasi berhasil! Wajah cocok.');
+                    const bestMatchSummary = {
+                        ...summaryBase,
+                        distance: bestMatch.avgDistance,
+                        matchCount: bestMatch.matchCount,
+                    };
+
+                    if (bestMatch.matchCount >= REQUIRED_MATCHES && bestMatch.avgDistance < matchLimit) {
+                        console.log('Verification success. Face matched.');
+                        const verifiedSample = bestMatch.sample;
+                        if (verifiedSample && verifiedSample.employeeId && activeEmployeeId !== verifiedSample.employeeId) {
+                            setActiveEmployee(verifiedSample);
+                        }
                         Swal.update({
                             title: 'Verifikasi Berhasil!',
-                            text: 'Mengambil snapshot...'
+                            text: 'Menampilkan hasil verifikasi...'
                         });
 
-                        const snapshotData = takeSnapshot(video);
-                        await sendPresenceRequest(csrfToken, snapshotData);
+                        await showVerificationResult(verifiedSample, bestMatchSummary);
 
                     } else {
                         console.log(
-                            `❌ Verifikasi gagal! Rata-rata jarak terlalu besar: ${avgDistance.toFixed(4)}`);
+                            `Verification failed. Avg distance too high: ${bestMatch.avgDistance.toFixed(4)}`
+                        );
+                        const summaryHtml = formatVerificationSummary(bestMatchSummary);
                         Swal.fire({
                             icon: 'error',
-                            title: 'Bukan Pemilik Akun',
-                            text: 'Wajah yang terdeteksi tidak cocok dengan data pemilik akun ini.',
+                            title: 'Wajah Tidak Dikenali',
+                            html: `<div class="text-start"><p class="mb-2">Wajah yang terdeteksi tidak cocok dengan data karyawan.</p>${summaryHtml}</div>`,
                             allowOutsideClick: false,
-                            showConfirmButton: false,
-                            timer: 2200,
-                            timerProgressBar: true,
+                            showConfirmButton: true,
+                            confirmButtonText: 'Ok',
                         });
                         resetButton();
                     }
-
                 } catch (err) {
                     console.error('❌ Error saat deteksi:', err);
                     console.error('❌ Stack trace:', err.stack);
@@ -1810,149 +1953,51 @@
         }
 
 
-        function takeSnapshot(videoElement) {
-            console.log('📷 Mengambil snapshot...');
-            const canvas = document.createElement('canvas');
-            canvas.width = videoElement.videoWidth;
-            canvas.height = videoElement.videoHeight;
-            const ctx = canvas.getContext('2d');
+        async function showVerificationResult(matchInfo = null, verificationSummary = null) {
+            const distanceValue = verificationSummary?.distance;
+            const distanceText = Number.isFinite(distanceValue) ? distanceValue.toFixed(4) : '-';
+            const employeeName = matchInfo?.employeeName || matchInfo?.employeeNik || activeEmployee?.name || activeEmployee?.nik || null;
+            const modalDetails = [];
 
-
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-            ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-            console.log('✅ Snapshot berhasil diambil');
-            return dataUrl;
-        }
-
-        async function sendPresenceRequest(csrfToken, snapshotData) {
-            console.log('📸 Memulai proses pengiriman presensi dengan foto...');
-            if (!EMPLOYEE_LOCATION) {
-                Swal.fire('Lokasi Tidak Tersedia', 'Lokasi presensi belum ditetapkan. Hubungi admin.', 'error');
-                resetButton();
-                return;
+            if (employeeName) {
+                modalDetails.push(`<p class="mb-1"><strong>Karyawan:</strong> ${employeeName}</p>`);
             }
+            modalDetails.push(`<p class="mb-0"><strong>Jarak Verifikasi:</strong> ${distanceText}</p>`);
 
-            if (geoState.latitude === null || geoState.longitude === null) {
-                Swal.fire('Lokasi Tidak Terbaca', 'Aktifkan GPS untuk melanjutkan.', 'error');
-                resetButton();
-                return;
-            }
-
-            if (!csrfToken) {
-                Swal.fire('Error', 'CSRF token tidak ditemukan. Refresh halaman.', 'error');
-                resetButton();
-                return;
-            }
-
-            Swal.update({
-                title: 'Mengirim Data Presensi...'
+            Swal.fire({
+                icon: 'success',
+                title: 'Verifikasi Berhasil!',
+                html: `<div class="text-start">${modalDetails.join('')}</div>`,
+                allowOutsideClick: false,
+                showConfirmButton: true,
+                confirmButtonText: 'Ok',
+                customClass: {
+                    popup: 'swal-presence-popup',
+                    confirmButton: 'swal-presence-confirm'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    recentSuccess = false;
+                    applyButtonIdleState();
+                }
             });
 
-            try {
-                const response = await fetch('/employee/presence/store', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        snapshot: snapshotData,
-                        coordinates: {
-                            latitude: geoState.latitude,
-                            longitude: geoState.longitude,
-                            accuracy: geoState.accuracy,
-                        },
-                    }),
-                });
-                const data = await response.json();
-
-                if (!response.ok) {
-                    console.error('🚨 Server error:', data);
-                    const errorMessage = data.error || data.message;
-                    throw new Error(errorMessage || `Server error (${response.status})`);
-                }
-
-                                console.log('✅ Presensi berhasil!');
-                const recordedTime = data.recorded_at || data.waktu_masuk || data.waktu_pulang;
-                const statusLabel = data.status_kehadiran || 'Tepat Waktu';
-                const isLate = statusLabel === 'Terlambat';
-                const shiftInfo = data.shift || {};
-                const actionType = data.action || 'clock_in';
-                const radiusLimit = EMPLOYEE_LOCATION ? Number(EMPLOYEE_LOCATION.radius || 0) : null;
-                const distanceText = locationValidation.distanceMeters !== null
-                    ? `${locationValidation.distanceMeters.toFixed(1)} m`
-                    : '-';
-                const radiusStatusText = locationValidation.isInsideRadius ? 'Dalam Radius' : 'Di Luar Radius';
-                const modalDetails = [
-                    `<p class="mb-1"><strong>Status:</strong> ${statusLabel}</p>`,
-                    `<p class="mb-1"><strong>Status Radius:</strong> ${radiusStatusText}</p>`,
-                    `<p class="mb-1"><strong>Jarak ke Lokasi:</strong> ${distanceText}</p>`,
-                ];
-                Swal.fire({
-                    icon: isLate ? 'warning' : 'success',
-                    title: actionType === 'clock_out'
-                        ? 'Presensi Pulang Tercatat'
-                        : (isLate ? 'Presensi Tercatat (Terlambat)' : 'Presensi Masuk Tercatat'),
-                    html: `<div class="text-start">${modalDetails.join('')}</div>`,
-                    allowOutsideClick: false,
-                    showConfirmButton: true,
-                    confirmButtonText: 'Ok',
-                    customClass: {
-                        popup: 'swal-presence-popup',
-                        confirmButton: 'swal-presence-confirm'
-                    }
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        recentSuccess = false;
-                        applyButtonIdleState();
-                    }
-                });
-                if (actionType === 'clock_out') {
-                    presenceState.hasCheckedIn = true;
-                    presenceState.hasCheckedOut = true;
-                    presenceState.canCheckOut = false;
-                    presenceState.lastClockOut = recordedTime || null;
-                    hasShownCheckoutReminder = true;
-                } else {
-                    presenceState.hasCheckedIn = true;
-                    presenceState.lastClockIn = recordedTime || null;
-                    presenceState.canCheckOut = false;
-                    hasShownCheckInReminder = true;
-                }
-                updateStatusIndicator('Berhasil!', `Presensi tercatat (${recordedTime || '-'}).`, 'success');
-                recentSuccess = true;
-                setTimeout(() => { recentSuccess = false; }, 15000);
-                isVerifying = false;
-                monitorPresenceStatus({
-                    showReminders: false
-                });
-                return data;
-            } catch (err) {
-                console.error('?? Terjadi kesalahan:', err);
-                Swal.fire('Error', err.message || 'Tidak dapat terhubung ke server.', 'error');
-                updateStatusIndicator('Error', 'Gagal mengirim data.', 'danger');
-                isVerifying = false; // Reset lock on error
-                monitorPresenceStatus({
-                    showReminders: false
-                });
-            }
-
+            updateStatusIndicator('Verifikasi Berhasil', `Jarak verifikasi: ${distanceText}`, 'success');
+            recentSuccess = true;
+            setTimeout(() => { recentSuccess = false; }, 15000);
+            isVerifying = false;
+            applyButtonIdleState();
         }
-
-
 
 
 
         async function monitorPresenceStatus(options = {}) {
-            const { showReminders = true } = options;
+            const { showReminders = true, employeeId = activeEmployeeId } = options;
+            if (!employeeId) {
+                return;
+            }
             try {
-                const response = await fetch('/employee/presence/status', {
+                const response = await fetch(`/admin/presence/status?employee_id=${employeeId}`, {
                     headers: {
                         'Accept': 'application/json'
                     },
@@ -1970,6 +2015,14 @@
 
         function updatePresenceUI(data, showReminders = true) {
             if (!data) return;
+            if (data.employee && activeEmployeeId === data.employee.id) {
+                activeEmployee = {
+                    id: data.employee.id,
+                    name: data.employee.nama || data.employee.nik || null,
+                    nik: data.employee.nik || null,
+                };
+                updateRecognizedEmployeeInfo();
+            }
 
             presenceState.hasCheckedIn = Boolean(data.presence && data.presence.has_checked_in);
             presenceState.hasCheckedOut = Boolean(data.presence && data.presence.has_checked_out);
@@ -2026,6 +2079,9 @@
         }
 
         function getCurrentActionMode() {
+            if (!activeEmployeeId) {
+                return 'idle';
+            }
             if (presenceState.isOnLeave) {
                 return 'on_leave';
             }
@@ -2129,3 +2185,9 @@
 
 
 @endsection
+
+
+
+
+
+

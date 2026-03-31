@@ -57,6 +57,10 @@ Route::middleware('auth')->group(function () {
         Route::delete('/admin/location/{location}/delete', [LocationController::class, 'destroy'])->name('location.delete');
 
         Route::resource('/admin/shifts', ShiftController::class)->except(['show']);
+        Route::get('/admin/presence', [AdminController::class, 'presenceCamera'])->name('admin.presence.camera');
+        Route::get('/admin/presence/embeddings', [AdminController::class, 'presenceEmbeddings'])->name('admin.presence.embeddings');
+        Route::post('/admin/presence/store', [AdminController::class, 'presenceStore'])->name('admin.presence.store');
+        Route::get('/admin/presence/status', [AdminController::class, 'presenceStatus'])->name('admin.presence.status');
         Route::get('/admin/presence/history', [AdminController::class, 'presenceHistory'])->name('admin.presence.history');
         Route::get('/admin/permit', [AdminController::class, 'permitIndex'])->name('admin.permit.index');
         Route::post('/admin/permit/{permit}/approve', [AdminController::class, 'approvePermit'])->name('admin.permit.approve');

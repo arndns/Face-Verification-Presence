@@ -47,7 +47,10 @@
                 <li class="{{ request()->routeIs('admin.permit.*') ? 'active' : '' }}">
                     <a href="{{ route('admin.permit.index') }}"><i class="fas fa-calendar-check"></i> Pengajuan Cuti</a>
                 </li>
-                <li class="{{ request()->routeIs('admin.presence.*') ? 'active' : '' }}">
+                <li class="{{ request()->routeIs('admin.presence.camera') ? 'active' : '' }}">
+                    <a href="{{ route('admin.presence.camera') }}"><i class="fas fa-camera"></i> Presensi</a>
+                </li>
+                <li class="{{ request()->routeIs('admin.presence.history') ? 'active' : '' }}">
                     <a href="{{ route('admin.presence.history') }}"><i class="fas fa-history"></i> Riwayat Presensi</a>
                 </li>
             </ul>

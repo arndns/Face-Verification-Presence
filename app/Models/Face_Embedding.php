@@ -9,13 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Face_Embedding extends Model
 {
     use HasFactory;
-    protected $fillable = ['employee_id', 'descriptor', 'orientation'];
+    protected $fillable = ['employee_id', 'descriptor'];
     protected $casts = [
         'descriptor' => 'array',
-    ];
-
-    protected $attributes = [
-        'orientation' => 'front',
     ];
 
     public function employee(): BelongsTo
